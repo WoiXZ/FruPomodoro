@@ -1,0 +1,2181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hearthwood — a cozy focus timer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,SOFT,WONK,wght@9..144,0..100,0..1,400..700&family=Karla:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+/* ---------- tokens ---------- */
+:root{
+  --paper:#E8E4D3;
+  --paper-2:#F1EDE0;
+  --card:#F6F2E6;
+  --ink:#3A3326;
+  --ink-soft:#6E6350;
+  --moss:#6B7F52;
+  --moss-deep:#4E6140;
+  --plum:#7E5B6B;
+  --berry:#A84E52;
+  --honey:#E8C468;
+  --honey-deep:#C69A3B;
+  --line:#CFC7AE;
+  --shadow:rgba(58,51,38,.14);
+  --night:0;
+  --scene-filter:none;
+  --sky-a:#CFE0E4; --sky-b:#F4E6D2;
+  --field:#9DB07C;
+  --field-2:#8AA06C;
+  --lit:0.35;
+  --radius:18px;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --paper:#221F1A; --paper-2:#2A261F; --card:#2F2A22;
+    --ink:#EDE5D3; --ink-soft:#B4A991; --line:#4A4234;
+    --moss:#8FA76F; --moss-deep:#6E8553; --plum:#B08CA0;
+    --berry:#D07A7C; --honey:#EFCE7C; --honey-deep:#C9A34A;
+    --shadow:rgba(0,0,0,.45);
+    --night:1; --scene-filter:brightness(.62) saturate(.8) hue-rotate(-6deg);
+    --lit:1;
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#221F1A; --paper-2:#2A261F; --card:#2F2A22;
+  --ink:#EDE5D3; --ink-soft:#B4A991; --line:#4A4234;
+  --moss:#8FA76F; --moss-deep:#6E8553; --plum:#B08CA0;
+  --berry:#D07A7C; --honey:#EFCE7C; --honey-deep:#C9A34A;
+  --shadow:rgba(0,0,0,.45);
+  --night:1; --scene-filter:brightness(.62) saturate(.8) hue-rotate(-6deg);
+  --lit:1;
+}
+
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:var(--paper);
+  background-image:
+    radial-gradient(circle at 12% 18%, rgba(107,127,82,.07) 0 2px, transparent 3px),
+    radial-gradient(circle at 78% 62%, rgba(126,91,107,.06) 0 2px, transparent 3px),
+    radial-gradient(circle at 42% 88%, rgba(168,78,82,.05) 0 2px, transparent 3px);
+  background-size:180px 180px, 240px 240px, 300px 300px;
+  color:var(--ink);
+  font-family:Karla, ui-sans-serif, system-ui, sans-serif;
+  font-size:16px;
+  line-height:1.55;
+  -webkit-font-smoothing:antialiased;
+  min-height:100vh;
+}
+h1,h2,h3,.display{
+  font-family:Fraunces, Georgia, "Times New Roman", serif;
+  font-variation-settings:'SOFT' 70,'WONK' 1,'opsz' 80;
+  font-weight:600;
+  letter-spacing:-.01em;
+  margin:0;
+}
+button{font-family:inherit;font-size:inherit;color:inherit;cursor:pointer}
+:focus-visible{outline:2.5px solid var(--plum);outline-offset:3px;border-radius:6px}
+
+.wrap{max-width:900px;margin:0 auto;padding:18px 18px 64px}
+
+/* ---------- header ---------- */
+header{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:22px}
+.brand{display:flex;align-items:baseline;gap:10px;margin-right:auto;min-width:0}
+.brand h1{font-size:clamp(1.35rem,4vw,1.7rem)}
+.brand .tag{font-size:.82rem;color:var(--ink-soft);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+@media (max-width:560px){.brand .tag{display:none}}
+
+.pouch{
+  display:flex;align-items:center;gap:7px;
+  background:var(--card);border:1.5px solid var(--line);
+  border-radius:999px;padding:6px 14px 6px 8px;
+  box-shadow:0 2px 0 var(--line);
+}
+.pouch .amt{font-family:Fraunces,serif;font-variation-settings:'SOFT' 70,'WONK' 1;font-weight:600;font-size:1.05rem;font-variant-numeric:tabular-nums}
+.pouch.bump{animation:bump .5s cubic-bezier(.3,1.6,.5,1)}
+@keyframes bump{0%{transform:scale(1)}40%{transform:scale(1.13)}100%{transform:scale(1)}}
+
+.icon-btn{
+  width:42px;height:42px;display:grid;place-items:center;
+  background:var(--card);border:1.5px solid var(--line);border-radius:14px;
+  box-shadow:0 2px 0 var(--line);transition:transform .12s ease, background .12s ease;
+}
+.icon-btn:hover{background:var(--paper-2)}
+.icon-btn:active{transform:translateY(2px);box-shadow:none}
+
+/* ---------- timer ---------- */
+.hearth{
+  background:var(--card);
+  border:1.5px solid var(--line);
+  border-radius:26px;
+  box-shadow:0 3px 0 var(--line), 0 14px 30px -22px var(--shadow);
+  padding:26px 22px 24px;
+  text-align:center;
+  position:relative;
+  overflow:hidden;
+}
+.phase-name{font-size:1.02rem;color:var(--ink-soft);margin:0 0 2px}
+.phase-name b{font-family:Fraunces,serif;font-variation-settings:'SOFT' 70,'WONK' 1;font-weight:600;color:var(--ink);font-size:1.18rem}
+.rounds{display:flex;gap:6px;justify-content:center;margin:8px 0 14px;min-height:12px}
+.rounds i{width:9px;height:9px;border-radius:50%;background:transparent;border:1.6px solid var(--moss);display:block}
+.rounds i.done{background:var(--moss)}
+
+.ring-wrap{position:relative;width:min(280px,72vw);margin:0 auto}
+.ring{display:block;width:100%;height:auto;transform:rotate(-90deg)}
+.ring .track{fill:none;stroke:var(--line);stroke-width:5;stroke-linecap:round;stroke-dasharray:1.5 11}
+.ring .prog{fill:none;stroke:var(--moss);stroke-width:9;stroke-linecap:round;transition:stroke-dashoffset .4s linear, stroke .4s ease}
+body.rest .ring .prog{stroke:var(--plum)}
+body.rest .rounds i{border-color:var(--plum)}
+body.rest .rounds i.done{background:var(--plum)}
+
+.clock{
+  position:absolute;inset:0;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:2px;pointer-events:none;
+}
+.clock .time{
+  font-family:Fraunces,serif;font-variation-settings:'SOFT' 70,'WONK' 1,'opsz' 144;
+  font-weight:600;font-size:clamp(2.6rem,10vw,3.5rem);line-height:1;
+  font-variant-numeric:tabular-nums;letter-spacing:-.02em;
+}
+.clock .hint{font-size:.8rem;color:var(--ink-soft);max-width:78%;line-height:1.35;padding:0 4px}
+
+.controls{display:flex;gap:10px;justify-content:center;align-items:center;margin-top:20px;flex-wrap:wrap}
+.btn{
+  border:1.5px solid var(--line);background:var(--paper-2);border-radius:14px;
+  padding:11px 18px;font-weight:500;box-shadow:0 2px 0 var(--line);
+  transition:transform .12s ease,background .12s ease;
+}
+.btn:hover{background:var(--paper)}
+.btn:active{transform:translateY(2px);box-shadow:none}
+.btn.primary{
+  background:var(--moss);color:#F6F2E6;border-color:var(--moss-deep);
+  box-shadow:0 3px 0 var(--moss-deep);padding:12px 32px;font-size:1.05rem;font-weight:700;
+}
+.btn.primary:hover{background:var(--moss-deep)}
+.btn.primary:active{box-shadow:0 1px 0 var(--moss-deep)}
+body.rest .btn.primary{background:var(--plum);border-color:#654857;box-shadow:0 3px 0 #654857}
+.btn[disabled]{opacity:.42;cursor:not-allowed;transform:none}
+
+/* ---------- scene ---------- */
+.village{margin-top:26px}
+.village-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+.village-head h2{font-size:1.25rem;margin-right:auto}
+.tabs{display:flex;gap:6px;background:var(--paper-2);border:1.5px solid var(--line);border-radius:999px;padding:4px}
+.tabs button{border:none;background:transparent;border-radius:999px;padding:6px 14px;font-size:.9rem;font-weight:500;color:var(--ink-soft)}
+.tabs button[aria-selected="true"]{background:var(--card);color:var(--ink);box-shadow:0 1px 3px var(--shadow);font-weight:700}
+
+.scene-frame{
+  position:relative;border:1.5px solid var(--line);border-radius:22px;overflow:hidden;
+  background:var(--card);box-shadow:0 3px 0 var(--line);
+}
+.scene{display:block;width:100%;height:auto;filter:var(--scene-filter);transition:filter .5s ease}
+.scene-empty{
+  position:absolute;left:0;right:0;bottom:14px;text-align:center;
+  font-size:.92rem;color:var(--ink);
+}
+.scene-empty span{background:var(--card);border:1.5px solid var(--line);border-radius:999px;padding:6px 16px;display:inline-block}
+.locked{
+  position:absolute;inset:0;display:grid;place-items:center;
+  background:var(--paper);
+  background:color-mix(in srgb, var(--paper) 80%, transparent);
+  backdrop-filter:blur(2px);text-align:center;padding:20px;
+}
+.locked p{margin:0 0 12px;max-width:34ch;color:var(--ink-soft)}
+.locked h3{margin-bottom:6px;font-size:1.15rem}
+
+/* scene animations */
+.drift{animation:drift 70s linear infinite}
+.drift2{animation:drift 104s linear infinite}
+@keyframes drift{from{transform:translateX(-200px)}to{transform:translateX(900px)}}
+.spin{transform-box:fill-box;transform-origin:center;animation:spin 14s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.smoke{animation:smoke 5s ease-in-out infinite}
+.smoke.b{animation-delay:1.6s}
+.smoke.c{animation-delay:3.2s}
+@keyframes smoke{0%{opacity:0;transform:translate(0,0) scale(.6)}25%{opacity:.5}100%{opacity:0;transform:translate(-10px,-34px) scale(1.5)}}
+.flick{transform-box:fill-box;transform-origin:bottom center;animation:flick 1.3s ease-in-out infinite alternate}
+@keyframes flick{from{transform:scaleY(.86) scaleX(1.04)}to{transform:scaleY(1.06) scaleX(.95)}}
+.sway{transform-box:fill-box;transform-origin:bottom center;animation:sway 6s ease-in-out infinite alternate}
+@keyframes sway{from{transform:rotate(-1.6deg)}to{transform:rotate(1.6deg)}}
+.stars{opacity:var(--night);transition:opacity .5s ease}
+.glow{opacity:var(--lit);transition:opacity .5s ease}
+.sprout{animation:sprout .7s cubic-bezier(.2,1.5,.4,1);transform-box:fill-box;transform-origin:bottom center}
+@keyframes sprout{0%{transform:scale(.2) translateY(14px);opacity:0}60%{opacity:1}100%{transform:scale(1) translateY(0);opacity:1}}
+
+/* ---------- modals ---------- */
+.modal{
+  position:fixed;inset:0;z-index:40;display:none;
+  background:rgba(40,34,24,.5);
+  padding:16px;overflow-y:auto;
+}
+.modal.open{display:flex;align-items:flex-start;justify-content:center}
+.sheet{
+  background:var(--card);border:1.5px solid var(--line);border-radius:24px;
+  width:100%;max-width:620px;margin:auto;padding:22px;
+  box-shadow:0 20px 50px -20px rgba(0,0,0,.5);
+  animation:rise .22s ease-out;
+}
+@keyframes rise{from{transform:translateY(14px);opacity:0}to{transform:none;opacity:1}}
+.sheet-head{display:flex;align-items:center;gap:10px;margin-bottom:4px}
+.sheet-head h2{margin-right:auto;font-size:1.35rem}
+.sheet .lede{color:var(--ink-soft);font-size:.93rem;margin:0 0 18px}
+
+.field{display:flex;align-items:center;gap:12px;padding:13px 0;border-bottom:1px dashed var(--line)}
+.field:last-of-type{border-bottom:none}
+.field .lab{margin-right:auto}
+.field .lab b{display:block;font-weight:500}
+.field .lab small{color:var(--ink-soft);font-size:.82rem}
+.stepper{display:flex;align-items:center;gap:4px;background:var(--paper-2);border:1.5px solid var(--line);border-radius:12px;padding:3px}
+.stepper button{width:34px;height:34px;border:none;background:transparent;border-radius:9px;font-size:1.25rem;line-height:1;display:grid;place-items:center}
+.stepper button:hover{background:var(--card)}
+.stepper input{
+  width:54px;border:none;background:transparent;text-align:center;
+  font-family:Fraunces,serif;font-variation-settings:'SOFT' 70,'WONK' 1;font-weight:600;
+  font-size:1.05rem;color:var(--ink);padding:4px 0;font-variant-numeric:tabular-nums;
+  -moz-appearance:textfield;
+}
+.stepper input::-webkit-outer-spin-button,.stepper input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+.unit{color:var(--ink-soft);font-size:.85rem;width:26px}
+
+.switch{width:52px;height:30px;border-radius:999px;border:1.5px solid var(--line);background:var(--paper-2);position:relative;padding:0}
+.switch::after{content:"";position:absolute;top:2px;left:2px;width:22px;height:22px;border-radius:50%;background:var(--ink-soft);transition:transform .18s ease,background .18s ease}
+.switch[aria-checked="true"]{background:color-mix(in srgb,var(--moss) 30%, var(--paper-2))}
+.switch[aria-checked="true"]::after{transform:translateX(22px);background:var(--moss)}
+
+/* ---------- shop ---------- */
+.shop-tabs{display:flex;gap:6px;margin:4px 0 16px;background:var(--paper-2);border:1.5px solid var(--line);border-radius:14px;padding:4px}
+.shop-tabs button{flex:1;border:none;background:transparent;border-radius:10px;padding:8px 6px;font-size:.92rem;color:var(--ink-soft);font-weight:500}
+.shop-tabs button[aria-selected="true"]{background:var(--card);color:var(--ink);font-weight:700;box-shadow:0 1px 3px var(--shadow)}
+
+.goods{display:grid;grid-template-columns:repeat(auto-fill,minmax(168px,1fr));gap:12px}
+.good{
+  border:1.5px solid var(--line);border-radius:16px;background:var(--paper-2);
+  padding:10px;display:flex;flex-direction:column;gap:6px;
+}
+.good.land{grid-column:1/-1;flex-direction:row;align-items:center;gap:14px;background:color-mix(in srgb,var(--moss) 9%, var(--paper-2))}
+.good .thumb{background:var(--card);border-radius:11px;border:1px solid var(--line);display:block;width:100%;height:84px}
+.good.land .thumb{width:104px;flex:none;height:72px}
+.good .nm{font-family:Fraunces,serif;font-variation-settings:'SOFT' 70,'WONK' 1;font-weight:600;font-size:1rem;line-height:1.2}
+.good .ds{font-size:.8rem;color:var(--ink-soft);line-height:1.35;margin-right:auto}
+.good .row{display:flex;align-items:center;gap:8px;margin-top:auto}
+.price{display:flex;align-items:center;gap:5px;font-weight:700;font-variant-numeric:tabular-nums;margin-right:auto}
+.buy{border:1.5px solid var(--moss-deep);background:var(--moss);color:#F6F2E6;border-radius:11px;padding:7px 14px;font-weight:700;font-size:.88rem;box-shadow:0 2px 0 var(--moss-deep)}
+.buy:active{transform:translateY(2px);box-shadow:none}
+.buy:disabled{background:var(--paper);color:var(--ink-soft);border-color:var(--line);box-shadow:none;cursor:not-allowed}
+.owned-tag{font-size:.85rem;color:var(--moss);font-weight:700;display:flex;align-items:center;gap:5px}
+.falling{transform-box:fill-box;transform-origin:center;animation:fallDown linear infinite}
+@keyframes fallDown{
+  0%{transform:translate(0,-24px) rotate(0deg);opacity:0}
+  8%{opacity:.9}
+  92%{opacity:.85}
+  100%{transform:translate(var(--drift,14px),330px) rotate(200deg);opacity:0}
+}
+
+.seasons{display:flex;gap:6px;flex-wrap:wrap}
+.seasons button{
+  border:1.5px solid var(--line);background:var(--paper-2);border-radius:11px;
+  padding:7px 12px;font-size:.85rem;font-weight:500;color:var(--ink-soft);
+  display:flex;align-items:center;gap:5px;
+}
+.seasons button[aria-pressed="true"]{background:var(--card);color:var(--ink);font-weight:700;box-shadow:0 1px 3px var(--shadow);border-color:var(--moss)}
+
+#aboutBtn:hover, #aboutBtn:focus-visible{opacity:.7}
+
+.locked-note{font-size:.85rem;color:var(--ink-soft);text-align:center;padding:18px 10px;border:1px dashed var(--line);border-radius:14px;grid-column:1/-1}
+
+.badge{border:1.5px solid var(--line);border-radius:16px;background:var(--paper-2);padding:14px 12px;text-align:center;display:flex;flex-direction:column;align-items:center;gap:5px}
+.badge .glyph{font-size:1.7rem;line-height:1}
+.badge.b-locked{opacity:.45}
+.badge .nm{font-family:Fraunces,serif;font-variation-settings:'SOFT' 70,'WONK' 1;font-weight:600;font-size:.95rem}
+.badge .ds{font-size:.78rem;color:var(--ink-soft)}
+
+/* ---------- toast ---------- */
+.toast-rail{position:fixed;left:50%;transform:translateX(-50%);bottom:24px;z-index:60;display:flex;flex-direction:column;gap:8px;align-items:center;pointer-events:none;width:calc(100% - 32px);max-width:400px}
+.toast{
+  background:var(--ink);color:var(--paper);border-radius:14px;padding:11px 18px;
+  font-size:.92rem;display:flex;align-items:center;gap:9px;
+  box-shadow:0 10px 26px -12px rgba(0,0,0,.6);animation:toastin .3s ease-out;
+}
+@keyframes toastin{from{transform:translateY(12px);opacity:0}to{transform:none;opacity:1}}
+.toast.toast-gold{
+  background:linear-gradient(135deg, var(--honey), var(--honey-deep));
+  color:#3A2A0E;
+  box-shadow:0 12px 30px -10px rgba(198,154,59,.6), 0 0 0 1.5px var(--honey-deep) inset;
+  animation:toastin .3s ease-out, goldpop .5s cubic-bezier(.3,1.6,.5,1);
+}
+@keyframes goldpop{0%{transform:scale(.88)}55%{transform:scale(1.04)}100%{transform:scale(1)}}
+
+footer{text-align:center;color:var(--ink-soft);font-size:.82rem;margin-top:34px}
+
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{animation-duration:.001ms !important;animation-iteration-count:1 !important;transition-duration:.001ms !important}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="brand">
+      <h1>Hearthwood</h1>
+      <span class="tag">focus a while, grow a village</span>
+    </div>
+    <div class="pouch" id="pouch" title="Acorn coins">
+      <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true">
+        <circle cx="12" cy="12" r="9.5" fill="#E8C468" stroke="#C69A3B" stroke-width="1.6"/>
+        <path d="M12 7c2.6 0 4.4 1.6 4.4 3.4S14.3 14 12 14s-4.4-1.8-4.4-3.6S9.4 7 12 7z" fill="#C69A3B" opacity=".55"/>
+        <path d="M12 14v3" stroke="#C69A3B" stroke-width="1.6" stroke-linecap="round"/>
+      </svg>
+      <span class="amt" id="coins">0</span>
+    </div>
+    <button class="icon-btn" id="dayNight" aria-label="Switch between day and night">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" id="dnIcon"></svg>
+    </button>
+    <button class="icon-btn" id="openShop" aria-label="Open the shop">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M4 8h16l-1.2 11.2a1.5 1.5 0 0 1-1.5 1.3H6.7a1.5 1.5 0 0 1-1.5-1.3L4 8z"/>
+        <path d="M8.5 11V7a3.5 3.5 0 0 1 7 0v4"/>
+      </svg>
+    </button>
+    <button class="icon-btn" id="openAmbience" aria-label="Open ambient sounds">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M4 10v4h3.2L12 17.5v-11L7.2 10H4z"/>
+        <path d="M16 9.5a4 4 0 0 1 0 5M18.4 7a7.2 7.2 0 0 1 0 10"/>
+      </svg>
+    </button>
+    <button class="icon-btn" id="openBadges" aria-label="View your milestones">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="9" r="6"/>
+        <path d="M8.3 14.3 7 21l5-2.6L17 21l-1.3-6.7"/>
+      </svg>
+    </button>
+    <button class="icon-btn" id="openSaveLoad" aria-label="Save or load your progress">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M5 4.5h11l3.5 3.5V19a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V5.5a1 1 0 0 1 1-1z"/>
+        <path d="M8 4.5v5h7.5v-5"/>
+        <path d="M7.2 14h9.6v6.5H7.2z"/>
+      </svg>
+    </button>
+    <button class="icon-btn" id="openSettings" aria-label="Open settings">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="3.2"/>
+        <path d="M19.2 14.6a1.5 1.5 0 0 0 .3 1.7l.1.1a1.8 1.8 0 1 1-2.6 2.6l-.1-.1a1.5 1.5 0 0 0-2.5 1v.3a1.8 1.8 0 1 1-3.6 0v-.2a1.5 1.5 0 0 0-2.6-1l-.1.1a1.8 1.8 0 1 1-2.6-2.6l.1-.1a1.5 1.5 0 0 0-1-2.5h-.3a1.8 1.8 0 1 1 0-3.6h.2a1.5 1.5 0 0 0 1-2.6l-.1-.1a1.8 1.8 0 1 1 2.6-2.6l.1.1a1.5 1.5 0 0 0 1.7.3h.1a1.5 1.5 0 0 0 .9-1.4v-.3a1.8 1.8 0 1 1 3.6 0v.2a1.5 1.5 0 0 0 2.5 1l.1-.1a1.8 1.8 0 1 1 2.6 2.6l-.1.1a1.5 1.5 0 0 0 1 2.5h.3a1.8 1.8 0 1 1 0 3.6h-.2a1.5 1.5 0 0 0-1.4.9z"/>
+      </svg>
+    </button>
+  </header>
+
+  <section class="hearth">
+    <p class="phase-name"><b id="phaseTitle">Time to focus</b></p>
+    <p class="phase-name" id="phaseSub" style="font-size:.86rem">Settle in — the kettle's on.</p>
+    <div class="rounds" id="rounds" aria-hidden="true"></div>
+
+    <div class="ring-wrap">
+      <svg class="ring" viewBox="0 0 280 280" aria-hidden="true">
+        <circle class="track" cx="140" cy="140" r="118"/>
+        <circle class="prog" id="prog" cx="140" cy="140" r="118" stroke-dasharray="741.4" stroke-dashoffset="0"/>
+      </svg>
+      <div class="clock">
+        <div class="time" id="time" role="timer" aria-live="off">25:00</div>
+        <div class="hint" id="reward">earns 10 coins</div>
+      </div>
+    </div>
+
+    <div class="controls">
+      <button class="btn" id="endBtn" disabled>Give up</button>
+      <button class="btn primary" id="startBtn">Start</button>
+      <button class="btn" id="skipBtn">Skip ahead</button>
+    </div>
+  </section>
+
+  <p id="quote" style="text-align:center;color:var(--ink-soft);font-size:.9rem;font-style:italic;margin:16px 4px 0;min-height:1.3em"></p>
+
+  <section class="village">
+    <div class="village-head">
+      <h2>Your Hearthwood</h2>
+      <div class="tabs" id="landTabs" role="tablist"></div>
+    </div>
+    <div class="scene-frame">
+      <div id="sceneHost"></div>
+      <div id="sceneOverlay"></div>
+    </div>
+  </section>
+
+  <footer>Coins are only earned by seeing a focus session all the way through.</footer>
+</div>
+
+<div class="modal" id="shopModal" role="dialog" aria-modal="true" aria-labelledby="shopTitle">
+  <div class="sheet">
+    <div class="sheet-head">
+      <h2 id="shopTitle">The Shop</h2>
+      <div class="pouch"><svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9.5" fill="#E8C468" stroke="#C69A3B" stroke-width="1.6"/><path d="M12 7c2.6 0 4.4 1.6 4.4 3.4S14.3 14 12 14s-4.4-1.8-4.4-3.6S9.4 7 12 7z" fill="#C69A3B" opacity=".55"/></svg><span class="amt" id="shopCoins">0</span></div>
+      <button class="icon-btn" data-close aria-label="Close the shop">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </div>
+    <p class="lede">Spend what you've earned. Anything you buy appears in your village straight away.</p>
+    <div class="shop-tabs" id="shopTabs" role="tablist"></div>
+    <div class="goods" id="goods"></div>
+  </div>
+</div>
+
+<div class="modal" id="settingsModal" role="dialog" aria-modal="true" aria-labelledby="setTitle">
+  <div class="sheet" style="max-width:520px">
+    <div class="sheet-head">
+      <h2 id="setTitle">Settings</h2>
+      <button class="icon-btn" data-close aria-label="Close settings">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </div>
+    <p class="lede">Type a number, or nudge it with the buttons. Changes apply to the next session.</p>
+
+    <div class="field">
+      <span class="lab"><b>Stopwatch mode</b><small>Count up freely instead of counting down a set session</small></span>
+      <button class="switch" id="stopwatchToggle" role="switch" aria-checked="false" aria-label="Stopwatch mode"></button>
+    </div>
+
+    <div class="field">
+      <span class="lab"><b>Focus session</b><small>How long you work before a break</small></span>
+      <div class="stepper" data-key="focus" data-min="1" data-max="300">
+        <button type="button" data-step="-5" aria-label="Five minutes less">−</button>
+        <input type="number" inputmode="numeric" aria-label="Focus minutes">
+        <button type="button" data-step="5" aria-label="Five minutes more">+</button>
+      </div><span class="unit">min</span>
+    </div>
+
+    <div class="field">
+      <span class="lab"><b>Short break</b><small>The breather between sessions</small></span>
+      <div class="stepper" data-key="short" data-min="1" data-max="60">
+        <button type="button" data-step="-1" aria-label="One minute less">−</button>
+        <input type="number" inputmode="numeric" aria-label="Short break minutes">
+        <button type="button" data-step="1" aria-label="One minute more">+</button>
+      </div><span class="unit">min</span>
+    </div>
+
+    <div class="field">
+      <span class="lab"><b>Long break</b><small>A proper rest after a few rounds</small></span>
+      <div class="stepper" data-key="long" data-min="1" data-max="90">
+        <button type="button" data-step="-5" aria-label="Five minutes less">−</button>
+        <input type="number" inputmode="numeric" aria-label="Long break minutes">
+        <button type="button" data-step="5" aria-label="Five minutes more">+</button>
+      </div><span class="unit">min</span>
+    </div>
+
+    <div class="field">
+      <span class="lab"><b>Rounds before a long break</b><small>Focus sessions per cycle</small></span>
+      <div class="stepper" data-key="rounds" data-min="1" data-max="10">
+        <button type="button" data-step="-1" aria-label="One round less">−</button>
+        <input type="number" inputmode="numeric" aria-label="Rounds per cycle">
+        <button type="button" data-step="1" aria-label="One round more">+</button>
+      </div><span class="unit">×</span>
+    </div>
+
+    <div class="field" style="flex-direction:column;align-items:stretch;gap:9px">
+      <span class="lab"><b>Season</b><small id="seasonNote">Auto follows today's date</small></span>
+      <div class="seasons" id="seasonPicker">
+        <button type="button" data-season="auto">🗓️ Auto</button>
+        <button type="button" data-season="spring">🌸 Spring</button>
+        <button type="button" data-season="summer">☀️ Summer</button>
+        <button type="button" data-season="autumn">🍂 Autumn</button>
+        <button type="button" data-season="winter">❄️ Winter</button>
+      </div>
+    </div>
+
+    <div class="field">
+      <span class="lab"><b>Continue automatically</b><small>Starts the next session for you when one ends</small></span>
+      <button class="switch" id="autoToggle" role="switch" aria-checked="true" aria-label="Continue automatically"></button>
+    </div>
+
+    <div class="field">
+      <span class="lab"><b>Chime when a session ends</b><small>A soft bell, nothing startling</small></span>
+      <button class="switch" id="soundToggle" role="switch" aria-checked="true" aria-label="Chime when a session ends"></button>
+    </div>
+
+    <div class="field" style="padding-top:18px">
+      <span class="lab"><b>Start over</b><small>Clears your coins and everything you've built</small></span>
+      <button class="btn" id="resetBtn" style="border-color:var(--berry);color:var(--berry)">Reset</button>
+    </div>
+
+    <div style="text-align:center;margin-top:26px">
+      <button id="aboutBtn" aria-label="About Hearthwood" style="background:none;border:none;color:var(--ink-soft);opacity:.32;font-size:.78rem;padding:8px;cursor:pointer;transition:opacity .25s ease;letter-spacing:.02em">🌾 Hearthwood</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="aboutModal" role="dialog" aria-modal="true" aria-labelledby="aboutTitle">
+  <div class="sheet" style="max-width:320px;text-align:center;position:relative;padding:34px 26px 28px">
+    <button class="icon-btn" data-close aria-label="Close" style="position:absolute;top:12px;right:12px;width:36px;height:36px">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+    </button>
+    <div style="font-size:2rem;margin-bottom:12px" aria-hidden="true">❤️</div>
+    <h2 id="aboutTitle" style="font-size:1.05rem;margin-bottom:14px;color:var(--ink-soft);font-weight:500;letter-spacing:.02em">About Hearthwood</h2>
+    <p style="font-family:Fraunces,serif;font-variation-settings:'SOFT' 70,'WONK' 1;font-weight:600;font-size:1.15rem;line-height:1.55;color:var(--ink);margin:0">
+      Made by Wojciech<br>for Minna<br>as a gift for our anniversary ❤️
+    </p>
+  </div>
+</div>
+
+<div class="modal" id="saveModal" role="dialog" aria-modal="true" aria-labelledby="saveTitle">
+  <div class="sheet" style="max-width:480px">
+    <div class="sheet-head">
+      <h2 id="saveTitle">Save &amp; Load</h2>
+      <button class="icon-btn" data-close aria-label="Close save and load">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </div>
+    <p class="lede">Your progress already saves itself as you play. Use this if you'd like a backup file of your own, or want to carry your village to another browser or device.</p>
+    <div class="field">
+      <span class="lab"><b>Download a save file</b><small id="lastSaved">Not downloaded yet this visit</small></span>
+      <button class="btn primary" id="downloadSave">Save file</button>
+    </div>
+    <div class="field">
+      <span class="lab"><b>Load a save file</b><small>Replaces your current coins and buildings — this can't be undone</small></span>
+      <button class="btn" id="loadSaveBtn">Choose file…</button>
+      <input type="file" id="loadSaveInput" accept="application/json,.json" style="display:none">
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="badgesModal" role="dialog" aria-modal="true" aria-labelledby="badgesTitle">
+  <div class="sheet">
+    <div class="sheet-head">
+      <h2 id="badgesTitle">Milestones</h2>
+      <button class="icon-btn" data-close aria-label="Close milestones">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </div>
+    <p class="lede">Little marks of how far you've come.</p>
+    <div class="goods" id="badgeGrid"></div>
+  </div>
+</div>
+
+<div class="modal" id="ambienceModal" role="dialog" aria-modal="true" aria-labelledby="ambienceTitle">
+  <div class="sheet" style="max-width:480px">
+    <div class="sheet-head">
+      <h2 id="ambienceTitle">Ambience</h2>
+      <button class="icon-btn" data-close aria-label="Close ambience">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </div>
+    <p class="lede">Layer a few soft sounds under your session. Mix and match what you've bought.</p>
+    <div id="ambienceEmpty" style="display:none">
+      <p class="lede" style="margin-bottom:14px">You haven't picked up any sounds yet — they live in the shop's Sounds tab, and they're cheap.</p>
+      <button class="btn primary" id="goToSoundsShop">Open the shop</button>
+    </div>
+    <div id="ambienceList"></div>
+    <div class="field" id="ambienceVolRow" style="display:none">
+      <span class="lab"><b>Volume</b></span>
+      <input type="range" id="ambientVolume" min="0" max="100" value="60" style="flex:1;accent-color:var(--moss)">
+    </div>
+  </div>
+</div>
+
+<div class="toast-rail" id="toasts" aria-live="polite"></div>
+
+<script>
+(function(){
+"use strict";
+
+/* ===================== catalogue ===================== */
+/* Every drawing is centred on x=0 with its base at y=0. */
+
+const C = {
+  wall:'#F0E3C8', wall2:'#E3D2B2', wood:'#8A6748', wood2:'#6E523A',
+  glass:'#FBE6B8', stone:'#C2B69D', stone2:'#A79A80',
+  leaf:'#6B7F52', leaf2:'#84996A', leaf3:'#556B41',
+  roofA:'#B2614E', roofB:'#7E5B6B', roofC:'#5E7A6A',
+  petal:'#E0A7AE', petal2:'#EBC46C', flame:'#E8A33D', flame2:'#F2CE6E',
+  fur:'#C97B4A', cream:'#F7F1E3'
+};
+
+function cottage(){return `
+  <path d="M-30 -2 h60" stroke="${C.wood2}" stroke-width="0" />
+  <rect x="-31" y="-45" width="62" height="45" rx="2" fill="${C.wall}" stroke="${C.wood2}" stroke-width="2"/>
+  <path d="M-25 -45 v45 M-12 -45 v45 M2 -45 v45 M16 -45 v45" stroke="${C.wall2}" stroke-width="1.5"/>
+  <path d="M-40 -43 L0 -72 L40 -43 Z" fill="${C.roofA}" stroke="${C.wood2}" stroke-width="2" stroke-linejoin="round"/>
+  <path d="M-30 -50 h60 M-22 -57 h44" stroke="#96503F" stroke-width="2" stroke-linecap="round"/>
+  <rect x="14" y="-70" width="10" height="15" fill="${C.stone}" stroke="${C.wood2}" stroke-width="1.8"/>
+  <g class="smoke"><circle cx="19" cy="-72" r="4" fill="#CFC7B4"/></g>
+  <g class="smoke b"><circle cx="19" cy="-72" r="3.4" fill="#CFC7B4"/></g>
+  <g class="smoke c"><circle cx="19" cy="-72" r="4.4" fill="#CFC7B4"/></g>
+  <rect x="-9" y="-25" width="18" height="25" rx="2" fill="${C.wood}" stroke="${C.wood2}" stroke-width="1.8"/>
+  <circle cx="4.5" cy="-12" r="1.5" fill="${C.petal2}"/>
+  <g class="glow"><rect x="-26" y="-36" width="13" height="13" rx="2" fill="${C.glass}"/><rect x="14" y="-36" width="13" height="13" rx="2" fill="${C.glass}"/></g>
+  <rect x="-26" y="-36" width="13" height="13" rx="2" fill="none" stroke="${C.wood2}" stroke-width="1.6"/>
+  <rect x="14" y="-36" width="13" height="13" rx="2" fill="none" stroke="${C.wood2}" stroke-width="1.6"/>
+  <path d="M-19.5 -36 v13 M-26 -29.5 h13 M20.5 -36 v13 M14 -29.5 h13" stroke="${C.wood2}" stroke-width="1.2"/>
+  <g class="sway"><circle cx="-34" cy="-6" r="6" fill="${C.leaf2}"/><circle cx="-38" cy="-10" r="4" fill="${C.leaf}"/><circle cx="-36" cy="-12" r="2" fill="${C.petal}"/></g>
+  <g class="sway"><circle cx="34" cy="-5" r="5.5" fill="${C.leaf2}"/><circle cx="37" cy="-9" r="3.5" fill="${C.leaf}"/><circle cx="36" cy="-11" r="2" fill="${C.petal2}"/></g>`;}
+
+function windmill(){return `
+  <path d="M-20 0 L-13 -58 H13 L20 0 Z" fill="${C.wall}" stroke="${C.wood2}" stroke-width="2" stroke-linejoin="round"/>
+  <path d="M-17 -16 h34 M-15 -32 h30" stroke="${C.wall2}" stroke-width="1.6"/>
+  <path d="M-17 -56 L0 -70 L17 -56 Z" fill="${C.roofB}" stroke="${C.wood2}" stroke-width="2" stroke-linejoin="round"/>
+  <rect x="-6" y="-16" width="12" height="16" rx="1.5" fill="${C.wood}" stroke="${C.wood2}" stroke-width="1.6"/>
+  <g class="spin">
+    <g stroke="${C.wood2}" stroke-width="2" fill="${C.cream}">
+      <rect x="-3" y="-93" width="6" height="26" rx="1.5"/>
+      <rect x="-3" y="-63" width="6" height="26" rx="1.5"/>
+      <rect x="-29" y="-68" width="26" height="6" rx="1.5"/>
+      <rect x="3" y="-68" width="26" height="6" rx="1.5"/>
+    </g>
+    <circle cx="0" cy="-65" r="4.5" fill="${C.wood}" stroke="${C.wood2}" stroke-width="2"/>
+  </g>`;}
+
+function well(){return `
+  <ellipse cx="0" cy="0" rx="24" ry="7" fill="${C.stone2}"/>
+  <path d="M-22 0 v-14 a22 5 0 0 0 44 0 v14" fill="${C.stone}" stroke="${C.wood2}" stroke-width="1.8"/>
+  <ellipse cx="0" cy="-14" rx="22" ry="5.5" fill="#6E7F86" stroke="${C.wood2}" stroke-width="1.8"/>
+  <path d="M-16 -16 v-22 M16 -16 v-22" stroke="${C.wood}" stroke-width="4" stroke-linecap="round"/>
+  <path d="M-24 -36 L0 -50 L24 -36 Z" fill="${C.roofA}" stroke="${C.wood2}" stroke-width="2" stroke-linejoin="round"/>
+  <path d="M0 -37 v10" stroke="${C.wood2}" stroke-width="1.4"/>
+  <rect x="-5" y="-27" width="10" height="7" rx="1.5" fill="${C.wood}" stroke="${C.wood2}" stroke-width="1.5"/>
+  <path d="M-12 -2 q3 -8 9 -2" stroke="${C.leaf}" stroke-width="1.6" fill="none"/>`;}
+
+function haystacks(){return `
+  <ellipse cx="-14" cy="-13" rx="17" ry="14" fill="${C.petal2}" stroke="#C7A24E" stroke-width="1.8"/>
+  <path d="M-28 -16 q14 -6 28 0 M-26 -8 q13 -5 25 0" stroke="#C7A24E" stroke-width="1.4" fill="none"/>
+  <ellipse cx="16" cy="-9" rx="12" ry="10" fill="${C.petal2}" stroke="#C7A24E" stroke-width="1.8"/>
+  <path d="M5 -11 q11 -5 22 0" stroke="#C7A24E" stroke-width="1.4" fill="none"/>
+  <path d="M-32 0 h64" stroke="${C.leaf3}" stroke-width="0"/>`;}
+
+function sheep(){return `
+  <path d="M-34 0 v-18 M-10 0 v-18 M14 0 v-18 M34 0 v-18" stroke="${C.wood}" stroke-width="3" stroke-linecap="round"/>
+  <path d="M-36 -14 h72 M-36 -6 h72" stroke="${C.wood}" stroke-width="2.6" stroke-linecap="round"/>
+  <g>
+    <ellipse cx="-14" cy="-10" rx="13" ry="9.5" fill="${C.cream}"/>
+    <circle cx="-24" cy="-14" r="5" fill="${C.cream}"/><circle cx="-16" cy="-17" r="6" fill="${C.cream}"/>
+    <circle cx="-6" cy="-15" r="5.5" fill="${C.cream}"/>
+    <ellipse cx="-1" cy="-13" rx="5" ry="4" fill="#5B5044"/>
+    <circle cx="0.6" cy="-14" r="1.1" fill="#F7F1E3"/>
+    <path d="M-20 -2 v2.5 M-8 -2 v2.5" stroke="#5B5044" stroke-width="2.2" stroke-linecap="round"/>
+  </g>
+  <g>
+    <ellipse cx="18" cy="-7" rx="9" ry="7" fill="${C.cream}"/>
+    <circle cx="11" cy="-10" r="4" fill="${C.cream}"/><circle cx="19" cy="-12" r="4.4" fill="${C.cream}"/>
+    <ellipse cx="26" cy="-9" rx="4" ry="3.2" fill="#5B5044"/>
+    <path d="M14 -1 v1.6 M22 -1 v1.6" stroke="#5B5044" stroke-width="2" stroke-linecap="round"/>
+  </g>`;}
+
+function garden(){return `
+  <rect x="-34" y="-12" width="68" height="12" rx="3" fill="#8A6A4C" stroke="${C.wood2}" stroke-width="1.8"/>
+  <path d="M-34 -6 h68" stroke="${C.wood2}" stroke-width="1.2" opacity=".5"/>
+  <g class="sway">
+    <path d="M-24 -12 v-13 M-8 -12 v-16 M8 -12 v-14 M24 -12 v-12" stroke="${C.leaf3}" stroke-width="2" stroke-linecap="round"/>
+    <circle cx="-24" cy="-27" r="4.5" fill="${C.petal}"/><circle cx="-24" cy="-27" r="1.6" fill="${C.petal2}"/>
+    <circle cx="-8" cy="-30" r="4.5" fill="${C.cream}"/><circle cx="-8" cy="-30" r="1.6" fill="${C.petal2}"/>
+    <circle cx="8" cy="-28" r="4.5" fill="#C99BC0"/><circle cx="8" cy="-28" r="1.6" fill="${C.petal2}"/>
+    <circle cx="24" cy="-26" r="4.2" fill="${C.petal}"/><circle cx="24" cy="-26" r="1.5" fill="${C.petal2}"/>
+    <path d="M-16 -18 q-6 -3 -7 -8 M0 -20 q6 -3 7 -9 M16 -18 q-6 -2 -7 -7" stroke="${C.leaf}" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+  </g>`;}
+
+function mushroomHouse(){return `
+  <path d="M-19 0 v-30 a19 8 0 0 1 38 0 V0 Z" fill="${C.wall}" stroke="${C.wood2}" stroke-width="2"/>
+  <path d="M-42 -28 a42 30 0 0 1 84 0 Z" fill="#C25C57" stroke="#8E3F3D" stroke-width="2" stroke-linejoin="round"/>
+  <circle cx="-24" cy="-38" r="5" fill="${C.cream}"/><circle cx="-2" cy="-47" r="6.5" fill="${C.cream}"/>
+  <circle cx="21" cy="-38" r="4.5" fill="${C.cream}"/><circle cx="10" cy="-33" r="3.4" fill="${C.cream}"/>
+  <circle cx="-13" cy="-32" r="3" fill="${C.cream}"/>
+  <path d="M-7 0 v-16 a7 7 0 0 1 14 0 V0 Z" fill="${C.wood}" stroke="${C.wood2}" stroke-width="1.8"/>
+  <circle cx="4" cy="-8" r="1.4" fill="${C.petal2}"/>
+  <g class="glow"><circle cx="-12" cy="-19" r="4.6" fill="${C.glass}"/><circle cx="13" cy="-19" r="4.6" fill="${C.glass}"/></g>
+  <circle cx="-12" cy="-19" r="4.6" fill="none" stroke="${C.wood2}" stroke-width="1.6"/>
+  <circle cx="13" cy="-19" r="4.6" fill="none" stroke="${C.wood2}" stroke-width="1.6"/>
+  <ellipse cx="-30" cy="-1" rx="9" ry="4" fill="${C.leaf2}"/><ellipse cx="29" cy="-1" rx="8" ry="3.5" fill="${C.leaf2}"/>`;}
+
+function treehouse(){return `
+  <path d="M-11 0 q3 -34 0 -60 q-2 -12 4 -18 h14 q6 6 4 18 q-3 26 0 60 Z" fill="#7B5B3E" stroke="${C.wood2}" stroke-width="2"/>
+  <path d="M-6 -12 q3 -30 1 -50" stroke="#65482F" stroke-width="1.6" fill="none"/>
+  <circle cx="-22" cy="-88" r="22" fill="${C.leaf2}"/><circle cx="20" cy="-92" r="24" fill="${C.leaf}"/>
+  <circle cx="0" cy="-104" r="21" fill="${C.leaf2}"/><circle cx="-4" cy="-78" r="19" fill="${C.leaf3}"/>
+  <rect x="-25" y="-62" width="50" height="5" rx="2" fill="${C.wood}" stroke="${C.wood2}" stroke-width="1.6"/>
+  <rect x="-19" y="-88" width="38" height="27" rx="2" fill="${C.wall}" stroke="${C.wood2}" stroke-width="2"/>
+  <path d="M-25 -86 L0 -102 L25 -86 Z" fill="${C.roofC}" stroke="${C.wood2}" stroke-width="2" stroke-linejoin="round"/>
+  <g class="glow"><rect x="-11" y="-81" width="13" height="12" rx="2" fill="${C.glass}"/></g>
+  <rect x="-11" y="-81" width="13" height="12" rx="2" fill="none" stroke="${C.wood2}" stroke-width="1.6"/>
+  <rect x="7" y="-76" width="9" height="15" rx="1.5" fill="${C.wood}" stroke="${C.wood2}" stroke-width="1.5"/>
+  <path d="M-16 -57 L-16 -22 M-6 -57 L-6 -22" stroke="${C.wood}" stroke-width="2.4"/>
+  <path d="M-17 -50 h12 M-17 -42 h12 M-17 -34 h12 M-17 -26 h12" stroke="${C.wood}" stroke-width="2.4" stroke-linecap="round"/>`;}
+
+function campfire(){return `
+  <ellipse cx="0" cy="-2" rx="24" ry="8" fill="${C.stone2}" opacity=".5"/>
+  <circle cx="-20" cy="-3" r="5" fill="${C.stone}"/><circle cx="-8" cy="-1" r="4.4" fill="${C.stone2}"/>
+  <circle cx="7" cy="-1" r="4.6" fill="${C.stone}"/><circle cx="19" cy="-3" r="5" fill="${C.stone2}"/>
+  <path d="M-16 -6 L14 -18 M16 -6 L-14 -18" stroke="#7B5B3E" stroke-width="5.5" stroke-linecap="round"/>
+  <g class="flick">
+    <path d="M0 -44 q11 12 8 22 q-2 9 -8 9 q-6 0 -8 -9 q-3 -10 8 -22z" fill="${C.flame}"/>
+    <path d="M0 -33 q6 8 4 14 q-1 5 -4 5 q-3 0 -4 -5 q-2 -6 4 -14z" fill="${C.flame2}"/>
+  </g>
+  <g class="glow"><ellipse cx="0" cy="-14" rx="34" ry="18" fill="${C.flame2}" opacity=".18"/></g>
+  <path d="M28 -4 q4 -10 10 -12 M-30 -4 q-4 -9 -10 -11" stroke="${C.leaf}" stroke-width="2" fill="none" stroke-linecap="round"/>`;}
+
+function pines(){return `
+  <path d="M-28 0 h8 v-8 h-8z" fill="#6B5038"/>
+  <path d="M-24 -6 L-38 -6 L-24 -26 L-10 -6z" fill="${C.leaf3}"/>
+  <path d="M-24 -20 L-34 -20 L-24 -38 L-14 -20z" fill="${C.leaf}"/>
+  <path d="M-24 -33 L-31 -33 L-24 -48 L-17 -33z" fill="${C.leaf2}"/>
+  <path d="M6 0 h7 v-7 H6z" fill="#6B5038"/>
+  <path d="M9.5 -5 L-2 -5 L9.5 -22 L21 -5z" fill="${C.leaf3}"/>
+  <path d="M9.5 -17 L1 -17 L9.5 -33 L18 -17z" fill="${C.leaf}"/>
+  <path d="M9.5 -29 L4 -29 L9.5 -42 L15 -29z" fill="${C.leaf2}"/>
+  <path d="M30 0 h5 v-6 h-5z" fill="#6B5038"/>
+  <path d="M32.5 -4 L24 -4 L32.5 -17 L41 -4z" fill="${C.leaf3}"/>
+  <path d="M32.5 -14 L26 -14 L32.5 -27 L39 -14z" fill="${C.leaf}"/>`;}
+
+function foxden(){return `
+  <path d="M-32 0 q10 -26 32 -26 q22 0 32 26 Z" fill="#7C6B4E" stroke="#5E5039" stroke-width="2"/>
+  <path d="M-28 0 q4 -12 14 -16 M4 -22 q14 2 20 16" stroke="#8F7E5E" stroke-width="1.6" fill="none"/>
+  <path d="M-11 0 q0 -15 11 -15 q11 0 11 15 Z" fill="#3B3226"/>
+  <g>
+    <ellipse cx="0" cy="-5" rx="8" ry="6.5" fill="${C.fur}"/>
+    <path d="M-6 -10 l-2 -7 l6 3z" fill="${C.fur}"/><path d="M6 -10 l2 -7 l-6 3z" fill="${C.fur}"/>
+    <ellipse cx="0" cy="-2.5" rx="5" ry="3.5" fill="${C.cream}"/>
+    <circle cx="-2.8" cy="-6.5" r="1.1" fill="#332B20"/><circle cx="2.8" cy="-6.5" r="1.1" fill="#332B20"/>
+    <circle cx="0" cy="-3" r="1.3" fill="#332B20"/>
+  </g>
+  <ellipse cx="-38" cy="-1" rx="9" ry="4" fill="${C.leaf2}"/>
+  <circle cx="36" cy="-6" r="4" fill="#C25C57"/><circle cx="36" cy="-7.5" r="1.2" fill="${C.cream}"/>
+  <path d="M36 -3 v3" stroke="${C.cream}" stroke-width="2.4"/>`;}
+
+function bridge(){return `
+  <path d="M-40 0 q40 -46 80 0 Z" fill="${C.stone}" stroke="${C.wood2}" stroke-width="2"/>
+  <path d="M-19 0 q19 -21 38 0 Z" fill="#5E6E74"/>
+  <path d="M-40 -14 q40 -40 80 0" fill="none" stroke="${C.stone2}" stroke-width="2.4"/>
+  <path d="M-34 -21 v-9 M-20 -30 v-9 M0 -34 v-9 M20 -30 v-9 M34 -21 v-9" stroke="${C.stone2}" stroke-width="3" stroke-linecap="round"/>
+  <path d="M-38 -27 q38 -20 76 0" fill="none" stroke="${C.stone2}" stroke-width="3.2" stroke-linecap="round"/>
+  <path d="M-46 -1 q6 -9 12 -2" stroke="${C.leaf}" stroke-width="2" fill="none" stroke-linecap="round"/>`;}
+
+function bakery(){return `
+  <rect x="-32" y="-52" width="64" height="52" rx="2" fill="${C.wall}" stroke="${C.wood2}" stroke-width="2"/>
+  <path d="M-36 -52 h72 l-6 -10 h-60z" fill="${C.wood}" stroke="${C.wood2}" stroke-width="2" stroke-linejoin="round"/>
+  <rect x="-34" y="-70" width="68" height="9" rx="3" fill="${C.roofA}" stroke="${C.wood2}" stroke-width="2"/>
+  <path d="M-30 -32 h60 l-5 9 h-50z" fill="${C.petal}" stroke="${C.wood2}" stroke-width="1.8" stroke-linejoin="round"/>
+  <path d="M-19 -32 l-4 9 M-8 -32 l-4 9 M3 -32 l-4 9 M14 -32 l-4 9" stroke="${C.cream}" stroke-width="3.4"/>
+  <g class="glow"><rect x="-27" y="-21" width="26" height="21" rx="2" fill="${C.glass}"/></g>
+  <rect x="-27" y="-21" width="26" height="21" rx="2" fill="none" stroke="${C.wood2}" stroke-width="1.8"/>
+  <ellipse cx="-19" cy="-12" rx="5" ry="3.4" fill="#C79A5B"/><ellipse cx="-8" cy="-11" rx="4.4" ry="3" fill="#D9AE70"/>
+  <rect x="6" y="-24" width="19" height="24" rx="2" fill="${C.wood}" stroke="${C.wood2}" stroke-width="1.8"/>
+  <circle cx="21" cy="-12" r="1.5" fill="${C.petal2}"/>
+  <circle cx="0" cy="-57" r="6" fill="${C.petal2}" stroke="${C.wood2}" stroke-width="1.6"/>
+  <path d="M-3 -57 q3 -4 6 0" stroke="${C.wood2}" stroke-width="1.4" fill="none"/>`;}
+
+function bookshop(){return `
+  <rect x="-26" y="-68" width="52" height="68" rx="2" fill="${C.wall2}" stroke="${C.wood2}" stroke-width="2"/>
+  <path d="M-31 -68 h62 l-8 -12 h-46z" fill="${C.roofB}" stroke="${C.wood2}" stroke-width="2" stroke-linejoin="round"/>
+  <g class="glow"><rect x="-19" y="-59" width="16" height="15" rx="2" fill="${C.glass}"/><rect x="3" y="-59" width="16" height="15" rx="2" fill="${C.glass}"/><rect x="-19" y="-36" width="38" height="17" rx="2" fill="${C.glass}"/></g>
+  <rect x="-19" y="-59" width="16" height="15" rx="2" fill="none" stroke="${C.wood2}" stroke-width="1.6"/>
+  <rect x="3" y="-59" width="16" height="15" rx="2" fill="none" stroke="${C.wood2}" stroke-width="1.6"/>
+  <rect x="-19" y="-36" width="38" height="17" rx="2" fill="none" stroke="${C.wood2}" stroke-width="1.8"/>
+  <path d="M-15 -23 v-9 h4 v9z M-9 -23 v-11 h4 v11z M-3 -23 v-8 h5 v8z M4 -23 v-12 h4 v12z M10 -23 v-9 h4 v9z" fill="${C.roofA}"/>
+  <rect x="-9" y="-17" width="18" height="17" rx="2" fill="${C.wood}" stroke="${C.wood2}" stroke-width="1.8"/>
+  <circle cx="5" cy="-8" r="1.4" fill="${C.petal2}"/>
+  <rect x="24" y="-50" width="14" height="10" rx="2" fill="${C.cream}" stroke="${C.wood2}" stroke-width="1.6"/>
+  <path d="M27 -46 h8 M27 -43 h6" stroke="${C.wood2}" stroke-width="1.2"/>`;}
+
+function cafe(){return `
+  <path d="M0 -58 v58" stroke="${C.wood}" stroke-width="4"/>
+  <path d="M-38 -58 q38 -16 76 0 Z" fill="${C.roofC}" stroke="${C.wood2}" stroke-width="2" stroke-linejoin="round"/>
+  <path d="M-26 -62 q13 -6 26 0 M0 -62 q13 6 26 4" stroke="${C.cream}" stroke-width="0" fill="none"/>
+  <path d="M-38 -58 q19 -8 38 -8 q19 0 38 8" fill="none" stroke="${C.cream}" stroke-width="3"/>
+  <ellipse cx="0" cy="-26" rx="20" ry="5" fill="${C.cream}" stroke="${C.wood2}" stroke-width="1.8"/>
+  <path d="M-3 -24 v24 M3 -24 v24" stroke="${C.wood}" stroke-width="2.4"/>
+  <path d="M-10 0 h20" stroke="${C.wood}" stroke-width="2.4" stroke-linecap="round"/>
+  <g stroke="${C.wood2}" stroke-width="2" fill="none" stroke-linecap="round">
+    <path d="M-32 0 v-14 M-22 0 v-14 M-32 -14 h10 M-32 -14 v-10 a5 5 0 0 1 10 0 v10"/>
+    <path d="M32 0 v-14 M22 0 v-14 M32 -14 h-10 M32 -14 v-10 a5 5 0 0 0 -10 0 v10"/>
+  </g>
+  <rect x="-8" y="-33" width="9" height="7" rx="1.5" fill="${C.cream}" stroke="${C.wood2}" stroke-width="1.4"/>
+  <circle cx="7" cy="-30" r="4" fill="${C.petal}"/><circle cx="7" cy="-30" r="1.4" fill="${C.petal2}"/>`;}
+
+function stall(){return `
+  <rect x="-24" y="-24" width="48" height="24" rx="2" fill="${C.wood}" stroke="${C.wood2}" stroke-width="2"/>
+  <path d="M-24 -18 h48" stroke="${C.wood2}" stroke-width="1.4"/>
+  <circle cx="-14" cy="-1" r="6" fill="#5B5044" stroke="${C.wood2}" stroke-width="1.6"/>
+  <circle cx="14" cy="-1" r="6" fill="#5B5044" stroke="${C.wood2}" stroke-width="1.6"/>
+  <path d="M-26 -24 h52 l-4 -8 h-44z" fill="${C.petal}" stroke="${C.wood2}" stroke-width="1.8" stroke-linejoin="round"/>
+  <path d="M-30 -32 h60" stroke="${C.wood2}" stroke-width="2.4" stroke-linecap="round"/>
+  <path d="M-26 -32 v-8 M26 -32 v-8" stroke="${C.wood}" stroke-width="2.4" stroke-linecap="round"/>
+  <path d="M-28 -40 h56" stroke="${C.wood}" stroke-width="3" stroke-linecap="round"/>
+  <g class="sway">
+    <circle cx="-16" cy="-44" r="4.4" fill="${C.petal}"/><circle cx="-6" cy="-47" r="4.4" fill="${C.petal2}"/>
+    <circle cx="4" cy="-45" r="4.4" fill="#C99BC0"/><circle cx="14" cy="-46" r="4.4" fill="${C.cream}"/>
+    <path d="M-16 -40 v-2 M-6 -43 v-2 M4 -41 v-2 M14 -42 v-2" stroke="${C.leaf3}" stroke-width="1.6"/>
+  </g>`;}
+
+function clocktower(){return `
+  <path d="M-19 0 L-15 -74 h30 L19 0 Z" fill="${C.stone}" stroke="${C.wood2}" stroke-width="2" stroke-linejoin="round"/>
+  <path d="M-17 -22 h34 M-16 -44 h32" stroke="${C.stone2}" stroke-width="1.8"/>
+  <rect x="-20" y="-80" width="40" height="7" rx="2" fill="${C.wood}" stroke="${C.wood2}" stroke-width="1.8"/>
+  <path d="M-20 -80 L0 -104 L20 -80 Z" fill="${C.roofB}" stroke="${C.wood2}" stroke-width="2" stroke-linejoin="round"/>
+  <circle cx="0" cy="-107" r="3" fill="${C.petal2}" stroke="${C.wood2}" stroke-width="1.4"/>
+  <circle cx="0" cy="-58" r="12" fill="${C.cream}" stroke="${C.wood2}" stroke-width="2"/>
+  <path d="M0 -58 v-7 M0 -58 l5 3" stroke="${C.wood2}" stroke-width="2" stroke-linecap="round"/>
+  <circle cx="0" cy="-58" r="1.6" fill="${C.wood2}"/>
+  <g class="glow"><rect x="-7" y="-34" width="14" height="12" rx="2" fill="${C.glass}"/></g>
+  <rect x="-7" y="-34" width="14" height="12" rx="2" fill="none" stroke="${C.wood2}" stroke-width="1.6"/>
+  <path d="M-8 0 v-15 a8 8 0 0 1 16 0 V0 Z" fill="${C.wood}" stroke="${C.wood2}" stroke-width="1.8"/>`;}
+
+function lamppost(){return `
+  <ellipse cx="0" cy="0" rx="9" ry="3.5" fill="${C.stone2}"/>
+  <path d="M-4 0 v-46 h8 V0 Z" fill="#4E5A55" stroke="${C.wood2}" stroke-width="1.6"/>
+  <path d="M-6 -12 h12" stroke="#4E5A55" stroke-width="3" stroke-linecap="round"/>
+  <path d="M-9 -46 h18 l-4 -6 h-10z" fill="#4E5A55" stroke="${C.wood2}" stroke-width="1.6" stroke-linejoin="round"/>
+  <g class="glow"><circle cx="0" cy="-58" r="17" fill="${C.flame2}" opacity=".22"/></g>
+  <path d="M-8 -46 l3 -14 h10 l3 14z" fill="${C.glass}" stroke="${C.wood2}" stroke-width="1.6" stroke-linejoin="round"/>
+  <path d="M-5 -60 h10 l-2 -4 h-6z" fill="#4E5A55" stroke="${C.wood2}" stroke-width="1.4"/>
+  <path d="M0 -64 v-4" stroke="#4E5A55" stroke-width="2" stroke-linecap="round"/>
+  <g class="sway"><path d="M-7 -12 q-8 4 -9 12" stroke="${C.leaf}" stroke-width="2" fill="none" stroke-linecap="round"/><circle cx="-16" cy="-1" r="3.4" fill="${C.petal}"/></g>`;}
+
+const THEMES = [
+  {
+    key:'countryside', label:'Countryside', landPrice:0,
+    landName:'Buttercup Meadow',
+    landDesc:'A soft green fold of land with a stream nearby. Yours from the start.',
+    ground:236, sky:['#CFE0E4','#F4E6D2'], grass:['#9DB07C','#879C68'],
+    items:[
+      {id:'cs_garden', name:'Kitchen Garden', price:30, x:82,  s:.95, draw:garden,    desc:'Four rows of flowers and herbs.'},
+      {id:'cs_well',   name:'Wishing Well',   price:45, x:300, s:.92, draw:well,      desc:'Cool water and a mossy roof.'},
+      {id:'cs_cottage',name:'Thatched Cottage',price:80,x:185, s:1.15,draw:cottage,   desc:'Smoke curling from the chimney.'},
+      {id:'cs_sheep',  name:'Sheep Paddock',  price:70, x:400, s:.9,  draw:sheep,     desc:'Two woolly residents and a fence.'},
+      {id:'cs_hay',    name:'Hay Bales',      price:25, x:510, s:.95, draw:haystacks, desc:'Fresh cut, smells like summer.'},
+      {id:'cs_mill',   name:'Old Windmill',   price:140,x:650, s:1,   draw:windmill,  desc:'Sails turning in the breeze.'}
+    ]
+  },
+  {
+    key:'forest', label:'Forest', landPrice:120,
+    landName:'Hollow Glade',
+    landDesc:'A quiet clearing deep among the pines, with a stream running through it.',
+    ground:242, sky:['#BFD3D0','#E6DCC0'], grass:['#7E9663','#65804F'],
+    items:[
+      {id:'fo_pines',  name:'Pine Grove',     price:30, x:74,  s:1,   draw:pines,        desc:'Three young pines, resin-sweet.'},
+      {id:'fo_mush',   name:'Toadstool House',price:95, x:205, s:1.05,draw:mushroomHouse,desc:'Red cap, round door, very small chairs.'},
+      {id:'fo_fire',   name:'Campfire Ring',  price:40, x:330, s:.95, draw:campfire,     desc:'Stones, logs and a steady flame.'},
+      {id:'fo_bridge', name:'Stone Bridge',   price:65, x:470, s:.95, draw:bridge,       desc:'Arched over the little stream.'},
+      {id:'fo_tree',   name:'Treehouse',      price:165,x:580, s:1,   draw:treehouse,    desc:'A ladder, a lantern, a good view.'},
+      {id:'fo_fox',    name:'Fox Den',        price:85, x:700, s:.95, draw:foxden,       desc:'Someone lives here. She is shy.'}
+    ]
+  },
+  {
+    key:'city', label:'City', landPrice:200,
+    landName:'Cobble Square',
+    landDesc:'A small market square with worn stones and window boxes on every ledge.',
+    ground:246, sky:['#E3D2CC','#F6E3C6'], grass:['#B9AE98','#A3977F'],
+    items:[
+      {id:'ct_lamp',  name:'Street Lamp',   price:35, x:82,  s:1,   draw:lamppost,   desc:'Lit at dusk, every dusk.'},
+      {id:'ct_bake',  name:'Bakery',        price:110,x:190, s:1,   draw:bakery,     desc:'Warm loaves in the window.'},
+      {id:'ct_book',  name:'Bookshop',      price:130,x:305, s:1,   draw:bookshop,   desc:'Narrow, tall, and full of dust.'},
+      {id:'ct_cafe',  name:'Café Table',    price:90, x:435, s:1,   draw:cafe,       desc:'Two chairs and a striped parasol.'},
+      {id:'ct_stall', name:'Flower Cart',   price:60, x:560, s:1,   draw:stall,      desc:'Peonies today, roses tomorrow.'},
+      {id:'ct_clock', name:'Clock Tower',   price:220,x:685, s:1,   draw:clocktower, desc:'Chimes the hour across the square.'}
+    ]
+  }
+];
+const THEME_BY_KEY = {}; THEMES.forEach(t=>THEME_BY_KEY[t.key]=t);
+const ALL_ITEMS = {}; THEMES.forEach(t=>t.items.forEach(i=>ALL_ITEMS[i.id]=i));
+
+const SOUNDS = [
+  {id:'snd_birds', name:'Birdsong', price:12, icon:'🐦', desc:'Soft chirps drifting through the trees.'},
+  {id:'snd_wind',  name:'Gentle Wind', price:10, icon:'🍃', desc:'A slow breeze moving through the grass.'},
+  {id:'snd_water', name:'Flowing Stream', price:15, icon:'💧', desc:'Water easing over smooth stones.'},
+  {id:'snd_piano', name:'Soft Piano', price:18, icon:'🎹', desc:'A quiet, looping instrumental.'}
+];
+const SOUND_BY_ID = {}; SOUNDS.forEach(s=>SOUND_BY_ID[s.id]=s);
+
+/* ===================== state ===================== */
+
+const DEFAULTS = {
+  coins:0,
+  owned:['land_countryside'],
+  settings:{focus:25, short:5, long:15, rounds:4, sound:true, season:'auto', autoContinue:true, ambientActive:[], ambientVolume:0.6, stopwatch:false},
+  round:0,
+  view:'countryside',
+  theme:null,
+  stats:{sessions:0, coinsEarned:0, totalWorkSeconds:0, shopVisits:0, purchases:0, foundHeart:false, touchGrass:false}
+};
+let state = JSON.parse(JSON.stringify(DEFAULTS));
+const LS_KEY = 'hearthwood.save.v1';
+let saveDoc = null;
+
+function sanitize(d){
+  if(!d || typeof d !== 'object') return null;
+  const s = JSON.parse(JSON.stringify(DEFAULTS));
+  if(typeof d.coins === 'number' && isFinite(d.coins)) s.coins = Math.max(0, Math.floor(d.coins));
+  if(Array.isArray(d.owned)) s.owned = d.owned.filter(x=>typeof x==='string');
+  if(!s.owned.includes('land_countryside')) s.owned.push('land_countryside');
+  if(d.settings && typeof d.settings==='object'){
+    const S=d.settings;
+    s.settings.focus  = clampInt(S.focus,1,300,25);
+    s.settings.short  = clampInt(S.short,1,60,5);
+    s.settings.long   = clampInt(S.long,1,90,15);
+    s.settings.rounds = clampInt(S.rounds,1,10,4);
+    s.settings.sound  = S.sound !== false;
+    s.settings.autoContinue = S.autoContinue !== false;
+    s.settings.ambientActive = Array.isArray(S.ambientActive) ? S.ambientActive.filter(function(id){ return !!SOUND_BY_ID[id]; }) : [];
+    s.settings.ambientVolume = (typeof S.ambientVolume === 'number' && isFinite(S.ambientVolume)) ? Math.min(1, Math.max(0, S.ambientVolume)) : 0.6;
+    s.settings.stopwatch = S.stopwatch === true;
+    s.settings.season = ['auto','spring','summer','autumn','winter'].indexOf(S.season)>=0 ? S.season : 'auto';
+  }
+  s.round = clampInt(d.round,0,50,0);
+  if(d.stats && typeof d.stats==='object'){
+    s.stats.sessions = clampInt(d.stats.sessions,0,100000,0);
+    s.stats.coinsEarned = clampInt(d.stats.coinsEarned,0,10000000,0);
+    s.stats.totalWorkSeconds = clampInt(d.stats.totalWorkSeconds,0,1000000000,0);
+    s.stats.shopVisits = clampInt(d.stats.shopVisits,0,1000000,0);
+    s.stats.purchases = clampInt(d.stats.purchases,0,1000000,0);
+    s.stats.foundHeart = d.stats.foundHeart === true;
+    s.stats.touchGrass = d.stats.touchGrass === true;
+  }
+  if(THEME_BY_KEY[d.view]) s.view = d.view;
+  if(d.theme==='dark'||d.theme==='light') s.theme = d.theme;
+  s.updatedAt = typeof d.updatedAt==='number' ? d.updatedAt : 0;
+  return s;
+}
+function clampInt(v,min,max,fb){ v = Math.round(Number(v)); if(!isFinite(v)) return fb; return Math.min(max, Math.max(min, v)); }
+
+function loadLocal(){
+  try{ const raw = localStorage.getItem(LS_KEY); if(!raw) return null; return sanitize(JSON.parse(raw)); }
+  catch(e){ return null; }
+}
+let saveTimer=null;
+function save(){
+  state.updatedAt = Date.now();
+  try{ localStorage.setItem(LS_KEY, JSON.stringify(state)); }catch(e){}
+  if(saveDoc){
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(function(){
+      try{ Promise.resolve(saveDoc.set(JSON.parse(JSON.stringify(state)))).catch(function(){}); }catch(e){}
+    }, 700);
+  }
+}
+async function initCloud(){
+  let db=null, user=null;
+  try{ db = await claude.use('db'); }catch(e){}
+  try{ user = await claude.use('user'); }catch(e){}
+  if(!db || !user) return;
+  let uid=null;
+  try{ uid = await user.id(); }catch(e){}
+  if(!uid) return;
+  try{ saveDoc = db.doc('data/users/'+uid+'/hearthwood'); }catch(e){ saveDoc=null; return; }
+  let remote=null;
+  try{
+    const snap = await saveDoc.get();
+    const raw = snap && (snap.data !== undefined ? snap.data : snap);
+    remote = sanitize(raw);
+  }catch(e){ remote=null; }
+  if(remote && (remote.updatedAt||0) > (state.updatedAt||0)){
+    state = remote;
+    applyTheme(); paintAll();
+    if(!running) resetPhase(false);
+  }else{
+    save();
+  }
+}
+
+/* ===================== timer ===================== */
+
+let phase='focus';
+let remaining = 25*60;
+let total = 25*60;
+let running = false;
+let endAt = 0;
+let raf = null;
+
+function phaseSeconds(p){
+  const s = state.settings;
+  return (p==='focus' ? s.focus : p==='long' ? s.long : s.short) * 60;
+}
+function coinsFor(mins){ return Math.max(2, Math.round(mins/5) * 2); }
+function isStopwatch(){ return !!state.settings.stopwatch; }
+
+const $ = function(id){ return document.getElementById(id); };
+const timeEl=$('time'), progEl=$('prog'), startBtn=$('startBtn'), skipBtn=$('skipBtn'), endBtn=$('endBtn');
+const CIRC = 2*Math.PI*118;
+
+function fmt(sec){
+  sec = Math.max(0, Math.round(sec));
+  const m = Math.floor(sec/60), s = sec%60;
+  return String(m).padStart(2,'0')+':'+String(s).padStart(2,'0');
+}
+
+function paintClock(){
+  if(isStopwatch()){ swRenderClock(); return; }
+  timeEl.textContent = fmt(remaining);
+  const pct = total > 0 ? (1 - remaining/total) : 0;
+  progEl.style.strokeDasharray = CIRC;
+  progEl.style.strokeDashoffset = CIRC * pct;
+  document.title = (running ? fmt(remaining)+' · ' : '') + 'Hearthwood';
+}
+
+function paintPhase(){
+  if(isStopwatch()){ swRenderPhase(); return; }
+  const rest = phase !== 'focus';
+  document.body.classList.toggle('rest', rest);
+  $('phaseTitle').textContent = phase==='focus' ? 'Time to focus'
+    : phase==='long' ? 'Long rest' : 'Short break';
+  $('phaseSub').textContent = phase==='focus' ? 'Settle in — the kettle\u2019s on.'
+    : phase==='long' ? 'You\u2019ve earned this one. Stand up, stretch, look out a window.'
+    : 'Stay away from the desk for a minute.';
+  $('reward').textContent = phase==='focus'
+    ? 'earns ' + coinsFor(state.settings.focus) + ' coins'
+    : 'no coins, just rest';
+  endBtn.textContent = phase==='focus' ? 'Give up' : 'Restart break';
+  // round pips
+  const host = $('rounds'); host.innerHTML='';
+  for(let i=0;i<state.settings.rounds;i++){
+    const pip = document.createElement('i');
+    if(i < state.round) pip.className='done';
+    host.appendChild(pip);
+  }
+}
+
+function resetPhase(keepRunning){
+  total = phaseSeconds(phase);
+  remaining = total;
+  if(!keepRunning) stopTick();
+  paintPhase(); paintClock(); paintButtons();
+}
+
+function paintButtons(){
+  if(isStopwatch()){ swRenderButtons(); return; }
+  skipBtn.style.display = '';
+  startBtn.textContent = running ? 'Pause' : (remaining < total ? 'Resume' : 'Start');
+  endBtn.disabled = (!running && remaining === total);
+}
+
+function stopTick(){
+  running = false;
+  if(raf){ clearInterval(raf); raf=null; }
+  paintButtons();
+  document.title = 'Hearthwood';
+}
+
+function tick(){
+  const left = (endAt - Date.now())/1000;
+  remaining = left;
+  if(left <= 0){
+    remaining = 0; paintClock();
+    stopTick();
+    finishPhase();
+    return;
+  }
+  paintClock();
+}
+
+function startPause(){
+  if(running){
+    remaining = Math.max(0,(endAt - Date.now())/1000);
+    stopTick(); paintClock();
+    return;
+  }
+  endAt = Date.now() + remaining*1000;
+  running = true;
+  raf = setInterval(tick, 200);
+  paintButtons();
+  chimeUnlock();
+  if(remaining === total) newQuote();
+}
+
+function finishPhase(){
+  if(phase === 'focus'){
+    const earned = coinsFor(state.settings.focus);
+    state.coins += earned;
+    state.stats.sessions += 1;
+    state.stats.coinsEarned += earned;
+    state.stats.totalWorkSeconds += state.settings.focus*60;
+    if(state.settings.focus*60 >= 14400) state.stats.touchGrass = true;
+    state.round += 1;
+    bumpCoins();
+    const long = state.round >= state.settings.rounds;
+    if(long) state.round = 0;
+    toast(coinIcon(16), 'Session finished. ' + earned + ' coins in the pouch.');
+    phase = long ? 'long' : 'short';
+    chime('done');
+  }else{
+    phase = 'focus';
+    toast('🌿','Break over. Back to it when you\u2019re ready.');
+    chime('back');
+  }
+  save();
+  resetPhase(false);
+  paintAll();
+  checkBadges();
+  if(state.settings.autoContinue) startPause();
+}
+
+function skip(){
+  if(phase === 'focus'){
+    toast('🍃','Skipped — no coins for that one.');
+    state.round += 1;
+    const long = state.round >= state.settings.rounds;
+    if(long) state.round = 0;
+    phase = long ? 'long' : 'short';
+  }else{
+    phase = 'focus';
+  }
+  save();
+  resetPhase(false);
+}
+
+function giveUp(){
+  if(phase === 'focus' && remaining < total){
+    toast('🕯️','Session ended early. Start fresh whenever.');
+  }
+  resetPhase(false);
+}
+
+startBtn.addEventListener('click', function(){ if(isStopwatch()) swStartPause(); else startPause(); });
+skipBtn.addEventListener('click', function(){ if(!isStopwatch()) skip(); });
+endBtn.addEventListener('click', function(){ if(isStopwatch()) swStop(); else giveUp(); });
+
+document.addEventListener('keydown', function(e){
+  if(e.target.tagName === 'INPUT') return;
+  if(e.code === 'Space'){ e.preventDefault(); if(isStopwatch()) swStartPause(); else startPause(); }
+  if(e.key === 'Escape'){ closeModals(); }
+});
+
+/* ----- stopwatch mode: counts up freely until stopped ----- */
+let swElapsed = 0;
+let swRunning = false;
+let swStartAt = 0;
+let swTimer = null;
+let swStopped = false;
+
+function swCurrentElapsed(){
+  return swElapsed + (swRunning ? (Date.now()-swStartAt)/1000 : 0);
+}
+function swFmt(sec){
+  sec = Math.max(0, Math.round(sec));
+  const h = Math.floor(sec/3600), m = Math.floor((sec%3600)/60), s = sec%60;
+  const mm = String(m).padStart(2,'0'), ss = String(s).padStart(2,'0');
+  return h>0 ? (String(h).padStart(2,'0')+':'+mm+':'+ss) : (mm+':'+ss);
+}
+function swRenderClock(){
+  const el = swCurrentElapsed();
+  timeEl.textContent = swFmt(el);
+  const pct = (el % 60) / 60;
+  progEl.style.strokeDasharray = CIRC;
+  progEl.style.strokeDashoffset = CIRC * pct;
+  document.title = (swRunning ? swFmt(el)+' · ' : '') + 'Hearthwood';
+}
+function swRenderPhase(){
+  document.body.classList.remove('rest');
+  $('phaseTitle').textContent = 'Stopwatch';
+  $('phaseSub').textContent = swRunning
+    ? 'Counting up \u2014 stop whenever you\u2019re ready.'
+    : swStopped
+      ? 'Stopped. Press start to begin a fresh count.'
+      : 'Press start whenever you\u2019re ready to begin.';
+  $('reward').textContent = 'coins added once you stop';
+  $('rounds').innerHTML = '';
+  endBtn.textContent = 'Stop';
+}
+function swRenderButtons(){
+  skipBtn.style.display = 'none';
+  startBtn.textContent = swRunning ? 'Pause' : (swStopped ? 'Start' : (swElapsed > 0 ? 'Resume' : 'Start'));
+  endBtn.disabled = !swRunning && swElapsed === 0 && !swStopped;
+}
+function swRenderAll(){ swRenderPhase(); swRenderClock(); swRenderButtons(); }
+
+function swStartPause(){
+  if(swRunning){
+    swElapsed = swCurrentElapsed();
+    swRunning = false;
+    if(swTimer){ clearInterval(swTimer); swTimer=null; }
+    swRenderAll();
+    return;
+  }
+  if(swStopped){ swElapsed = 0; swStopped = false; }
+  swStartAt = Date.now();
+  swRunning = true;
+  swTimer = setInterval(swRenderClock, 200);
+  chimeUnlock();
+  if(swElapsed === 0) newQuote();
+  swRenderAll();
+}
+
+function swStop(){
+  if(!swRunning && swElapsed === 0 && !swStopped) return;
+  const finalElapsed = swCurrentElapsed();
+  swElapsed = finalElapsed;
+  swRunning = false;
+  if(swTimer){ clearInterval(swTimer); swTimer=null; }
+  swStopped = true;
+  state.stats.totalWorkSeconds += finalElapsed;
+  if(finalElapsed >= 14400) state.stats.touchGrass = true;
+  const mins = finalElapsed/60;
+  if(mins >= 1){
+    const earned = coinsFor(mins);
+    state.coins += earned;
+    state.stats.sessions += 1;
+    state.stats.coinsEarned += earned;
+    bumpCoins();
+    toast(coinIcon(16), 'Stopped at '+swFmt(finalElapsed)+'. '+earned+' coins in the pouch.');
+    chime('done');
+    save();
+    checkBadges();
+  }else{
+    toast('🕯️', 'Stopped at '+swFmt(finalElapsed)+' \u2014 under a minute, so no coins this time.');
+    save();
+    checkBadges();
+  }
+  swRenderAll();
+}
+function swReset(){
+  if(swTimer){ clearInterval(swTimer); swTimer=null; }
+  swRunning = false; swElapsed = 0; swStopped = false;
+}
+$('stopwatchToggle').addEventListener('click', function(){
+  const turningOn = !state.settings.stopwatch;
+  state.settings.stopwatch = turningOn;
+  $('stopwatchToggle').setAttribute('aria-checked', String(turningOn));
+  if(turningOn){
+    stopTick();
+    swReset();
+  }else{
+    swReset();
+    phase = 'focus';
+    resetPhase(false);
+  }
+  save();
+  paintPhase(); paintClock(); paintButtons();
+});
+
+/* ===================== chime ===================== */
+let actx = null;
+function chimeUnlock(){
+  if(!actx){
+    if(!window.AudioContext && !window.webkitAudioContext) return;
+    try{ actx = new (window.AudioContext||window.webkitAudioContext)(); }catch(e){ return; }
+  }
+  if(actx.state === 'suspended'){ try{ actx.resume(); }catch(e){} }
+  syncAmbientVoices();
+}
+function chime(kind){
+  if(!state.settings.sound || !actx) return;
+  try{
+    if(actx.state === 'suspended') actx.resume();
+    const notes = kind==='done' ? [523.25, 659.25, 783.99] : [659.25, 523.25];
+    notes.forEach(function(f,i){
+      const o = actx.createOscillator(), g = actx.createGain();
+      o.type='sine'; o.frequency.value=f;
+      const t0 = actx.currentTime + i*0.17;
+      g.gain.setValueAtTime(0.0001, t0);
+      g.gain.exponentialRampToValueAtTime(0.16, t0+0.04);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0+1.5);
+      o.connect(g); g.connect(actx.destination);
+      o.start(t0); o.stop(t0+1.6);
+    });
+  }catch(e){}
+}
+
+/* ===================== ambient sounds ===================== */
+let ambientMaster = null;
+let ambientVoices = {};
+
+function ensureAmbientMaster(){
+  if(!actx) return null;
+  if(!ambientMaster){
+    ambientMaster = actx.createGain();
+    ambientMaster.gain.value = state.settings.ambientVolume;
+    ambientMaster.connect(actx.destination);
+  }
+  return ambientMaster;
+}
+function makeNoiseBuffer(seconds, brown){
+  const rate = actx.sampleRate;
+  const len = Math.floor(rate*seconds);
+  const buffer = actx.createBuffer(1, len, rate);
+  const data = buffer.getChannelData(0);
+  let last = 0;
+  for(let i=0;i<len;i++){
+    const white = Math.random()*2-1;
+    if(brown){ last = (last + 0.02*white)/1.02; data[i] = last*3.2; }
+    else data[i] = white*0.6;
+  }
+  return buffer;
+}
+function makeWaterVoice(){
+  const src = actx.createBufferSource();
+  src.buffer = makeNoiseBuffer(4, true); src.loop = true;
+  const filter = actx.createBiquadFilter();
+  filter.type='bandpass'; filter.frequency.value=950; filter.Q.value=0.8;
+  const lfo = actx.createOscillator(); lfo.frequency.value=0.17;
+  const lfoGain = actx.createGain(); lfoGain.gain.value=380;
+  lfo.connect(lfoGain); lfoGain.connect(filter.frequency);
+  const gain = actx.createGain(); gain.gain.value=0;
+  src.connect(filter); filter.connect(gain);
+  src.start(); lfo.start();
+  return {gain:gain, target:0.55, stopNodes:function(){ try{src.stop();}catch(e){} try{lfo.stop();}catch(e){} }};
+}
+function makeWindVoice(){
+  const src = actx.createBufferSource();
+  src.buffer = makeNoiseBuffer(5, true); src.loop = true;
+  const filter = actx.createBiquadFilter();
+  filter.type='lowpass'; filter.frequency.value=480; filter.Q.value=0.5;
+  const lfo = actx.createOscillator(); lfo.frequency.value=0.06;
+  const lfoGain = actx.createGain(); lfoGain.gain.value=240;
+  lfo.connect(lfoGain); lfoGain.connect(filter.frequency);
+  const gain = actx.createGain(); gain.gain.value=0;
+  src.connect(filter); filter.connect(gain);
+  src.start(); lfo.start();
+  return {gain:gain, target:0.45, stopNodes:function(){ try{src.stop();}catch(e){} try{lfo.stop();}catch(e){} }};
+}
+function makeBirdsVoice(){
+  const gain = actx.createGain(); gain.gain.value=0;
+  let timer = null, alive = true;
+  function chirp(){
+    if(!alive) return;
+    const base = 1900 + Math.random()*1300;
+    const o = actx.createOscillator(), g = actx.createGain();
+    o.type='sine';
+    const t0 = actx.currentTime;
+    o.frequency.setValueAtTime(base, t0);
+    o.frequency.exponentialRampToValueAtTime(base*(0.55+Math.random()*0.5), t0+0.09);
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(0.55, t0+0.015);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0+0.13);
+    o.connect(g); g.connect(gain);
+    o.start(t0); o.stop(t0+0.15);
+    if(Math.random() < 0.45){
+      setTimeout(function(){
+        if(!alive) return;
+        const o2 = actx.createOscillator(), g2 = actx.createGain();
+        o2.type='sine';
+        const t1 = actx.currentTime;
+        o2.frequency.setValueAtTime(base*1.15, t1);
+        o2.frequency.exponentialRampToValueAtTime(base*0.7, t1+0.08);
+        g2.gain.setValueAtTime(0.0001, t1);
+        g2.gain.exponentialRampToValueAtTime(0.45, t1+0.012);
+        g2.gain.exponentialRampToValueAtTime(0.0001, t1+0.1);
+        o2.connect(g2); g2.connect(gain);
+        o2.start(t1); o2.stop(t1+0.12);
+      }, 130+Math.random()*90);
+    }
+    timer = setTimeout(chirp, 900+Math.random()*2600);
+  }
+  timer = setTimeout(chirp, 300);
+  return {gain:gain, target:1, stopNodes:function(){ alive=false; clearTimeout(timer); }};
+}
+function makePianoVoice(){
+  const gain = actx.createGain(); gain.gain.value=0;
+  const delay = actx.createDelay(1.2); delay.delayTime.value=0.42;
+  const feedback = actx.createGain(); feedback.gain.value=0.28;
+  const wet = actx.createGain(); wet.gain.value=0.35;
+  gain.connect(delay); delay.connect(feedback); feedback.connect(delay);
+  delay.connect(wet);
+  const chords = [[220,277.18,329.63,392],[196,246.94,293.66,349.23],[174.61,220,261.63,329.63],[146.83,196,220,261.63]];
+  let idx = 0, timer = null, alive = true;
+  function playChord(){
+    if(!alive) return;
+    const notes = chords[idx % chords.length]; idx++;
+    notes.forEach(function(f,i){
+      const o = actx.createOscillator(), g = actx.createGain();
+      o.type = i===0 ? 'triangle' : 'sine';
+      o.frequency.value = f;
+      const t0 = actx.currentTime + i*0.35;
+      g.gain.setValueAtTime(0.0001, t0);
+      g.gain.exponentialRampToValueAtTime(0.11, t0+1.4);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0+7.5);
+      o.connect(g); g.connect(gain);
+      o.start(t0); o.stop(t0+7.6);
+    });
+    timer = setTimeout(playChord, 9000);
+  }
+  timer = setTimeout(playChord, 200);
+  return {gain:gain, target:0.6, stopNodes:function(){ alive=false; clearTimeout(timer); }};
+}
+const VOICE_MAKERS = {snd_water:makeWaterVoice, snd_wind:makeWindVoice, snd_birds:makeBirdsVoice, snd_piano:makePianoVoice};
+
+function startVoice(id){
+  if(!actx || ambientVoices[id]) return;
+  const master = ensureAmbientMaster();
+  const maker = VOICE_MAKERS[id];
+  if(!master || !maker) return;
+  const voice = maker();
+  voice.gain.connect(master);
+  const now = actx.currentTime;
+  voice.gain.gain.cancelScheduledValues(now);
+  voice.gain.gain.setValueAtTime(0.0001, now);
+  voice.gain.gain.linearRampToValueAtTime(voice.target, now+1.4);
+  ambientVoices[id] = voice;
+}
+function stopVoice(id){
+  const voice = ambientVoices[id];
+  if(!voice || !actx) return;
+  const now = actx.currentTime;
+  try{
+    voice.gain.gain.cancelScheduledValues(now);
+    voice.gain.gain.setValueAtTime(voice.gain.gain.value, now);
+    voice.gain.gain.linearRampToValueAtTime(0.0001, now+0.9);
+  }catch(e){}
+  setTimeout(function(){ try{ voice.stopNodes(); voice.gain.disconnect(); }catch(e){} }, 1000);
+  delete ambientVoices[id];
+}
+function syncAmbientVoices(){
+  if(!actx) return;
+  const want = state.settings.ambientActive.filter(function(id){ return state.owned.indexOf(id) >= 0; });
+  Object.keys(ambientVoices).forEach(function(id){ if(want.indexOf(id) === -1) stopVoice(id); });
+  want.forEach(function(id){ if(!ambientVoices[id]) startVoice(id); });
+}
+function toggleAmbient(id){
+  const i = state.settings.ambientActive.indexOf(id);
+  if(i === -1) state.settings.ambientActive.push(id); else state.settings.ambientActive.splice(i,1);
+  save();
+  chimeUnlock();
+  syncAmbientVoices();
+  paintAmbience();
+}
+
+/* ----- shop previews: a short, temporary taste of a sound, own it or not ----- */
+let previewVoice = null, previewId = null, previewTimer = null;
+function updatePreviewButton(id, playing){
+  document.querySelectorAll('[data-preview="'+id+'"]').forEach(function(b){
+    b.textContent = playing ? '■ Stop' : '▶ Preview';
+    b.setAttribute('aria-pressed', String(playing));
+  });
+}
+function stopPreview(){
+  const id = previewId;
+  if(previewVoice && actx){
+    const v = previewVoice;
+    try{
+      const now = actx.currentTime;
+      v.gain.gain.cancelScheduledValues(now);
+      v.gain.gain.setValueAtTime(v.gain.gain.value, now);
+      v.gain.gain.linearRampToValueAtTime(0.0001, now+0.35);
+    }catch(e){}
+    setTimeout(function(){ try{ v.stopNodes(); v.gain.disconnect(); }catch(e){} }, 400);
+  }
+  clearTimeout(previewTimer);
+  previewVoice = null; previewTimer = null; previewId = null;
+  if(id) updatePreviewButton(id, false);
+}
+function togglePreview(id){
+  chimeUnlock();
+  if(!actx) return;
+  if(previewId === id){ stopPreview(); return; }
+  stopPreview();
+  const maker = VOICE_MAKERS[id];
+  const master = ensureAmbientMaster();
+  if(!maker || !master) return;
+  const voice = maker();
+  voice.gain.connect(master);
+  const now = actx.currentTime;
+  voice.gain.gain.cancelScheduledValues(now);
+  voice.gain.gain.setValueAtTime(0.0001, now);
+  voice.gain.gain.linearRampToValueAtTime(voice.target, now+0.3);
+  previewVoice = voice; previewId = id;
+  updatePreviewButton(id, true);
+  previewTimer = setTimeout(stopPreview, 6000);
+}
+function wirePreviews(){
+  document.querySelectorAll('[data-preview]').forEach(function(b){
+    b.addEventListener('click', function(){ togglePreview(b.getAttribute('data-preview')); });
+  });
+}
+
+function paintAmbience(){
+  const owned = SOUNDS.filter(function(s){ return state.owned.indexOf(s.id) >= 0; });
+  $('ambienceEmpty').style.display = owned.length ? 'none' : 'block';
+  $('ambienceVolRow').style.display = owned.length ? 'flex' : 'none';
+  const list = $('ambienceList'); list.innerHTML = '';
+  owned.forEach(function(s){
+    const row = document.createElement('div');
+    row.className = 'field';
+    const on = state.settings.ambientActive.indexOf(s.id) >= 0;
+    row.innerHTML = '<span class="lab"><b>'+s.icon+' '+s.name+'</b></span>'
+      + '<button class="switch" data-ambient="'+s.id+'" role="switch" aria-checked="'+on+'" aria-label="Toggle '+s.name+'"></button>';
+    list.appendChild(row);
+  });
+  document.querySelectorAll('[data-ambient]').forEach(function(b){
+    b.addEventListener('click', function(){ toggleAmbient(b.getAttribute('data-ambient')); });
+  });
+  $('ambientVolume').value = Math.round(state.settings.ambientVolume*100);
+}
+$('openAmbience').addEventListener('click', function(){
+  paintAmbience();
+  chimeUnlock();
+  openModal($('ambienceModal'));
+});
+$('goToSoundsShop').addEventListener('click', function(){
+  closeModals();
+  shopTab = 'sounds';
+  trackShopVisit();
+  paintShop();
+  openModal($('shopModal'));
+});
+$('ambientVolume').addEventListener('input', function(e){
+  state.settings.ambientVolume = (+e.target.value)/100;
+  if(ambientMaster) ambientMaster.gain.value = state.settings.ambientVolume;
+  save();
+});
+function coinIcon(n){
+  n = n||18;
+  return '<svg width="'+n+'" height="'+n+'" viewBox="0 0 24 24" aria-hidden="true" style="flex:none"><circle cx="12" cy="12" r="9.5" fill="#E8C468" stroke="#C69A3B" stroke-width="1.6"/><path d="M12 7c2.6 0 4.4 1.6 4.4 3.4S14.3 14 12 14s-4.4-1.8-4.4-3.6S9.4 7 12 7z" fill="#C69A3B" opacity=".55"/></svg>';
+}
+function toast(icon, msg){
+  const rail = $('toasts');
+  const el = document.createElement('div');
+  el.className = 'toast';
+  el.innerHTML = (icon.indexOf('<') === 0 ? icon : '<span>'+icon+'</span>') + '<span>'+msg+'</span>';
+  rail.appendChild(el);
+  setTimeout(function(){
+    el.style.transition='opacity .4s ease, transform .4s ease';
+    el.style.opacity='0'; el.style.transform='translateY(8px)';
+    setTimeout(function(){ el.remove(); }, 420);
+  }, 3400);
+}
+function bumpCoins(){
+  paintCoins();
+  const p = $('pouch');
+  p.classList.remove('bump'); void p.offsetWidth; p.classList.add('bump');
+}
+function paintCoins(){
+  $('coins').textContent = state.coins;
+  $('shopCoins').textContent = state.coins;
+}
+
+/* ===================== seasons ===================== */
+function autoSeason(){
+  const m = new Date().getMonth(); // 0=Jan
+  if(m===11||m===0||m===1) return 'winter';
+  if(m>=2&&m<=4) return 'spring';
+  if(m>=5&&m<=7) return 'summer';
+  return 'autumn';
+}
+function effectiveSeason(){
+  return state.settings.season === 'auto' ? autoSeason() : state.settings.season;
+}
+function seasonMeta(season){
+  return {
+    spring:{skyWash:'rgba(244,180,196,.16)', groundWash:'rgba(251,236,213,.14)', colors:['#EFB3BC','#F7E4B9','#FBF6E9'], count:8, kind:'petal'},
+    summer:{skyWash:null, groundWash:null, colors:[], count:0, kind:null},
+    autumn:{skyWash:'rgba(198,120,44,.16)', groundWash:'rgba(120,72,30,.14)', colors:['#C97B3E','#A85A34','#D9A24B'], count:9, kind:'leaf'},
+    winter:{skyWash:'rgba(200,220,232,.32)', groundWash:'rgba(255,255,255,.55)', colors:['#FFFFFF','#EFF6F8'], count:13, kind:'flake'}
+  }[season] || {skyWash:null, groundWash:null, colors:[], count:0, kind:null};
+}
+function particleShape(kind, color){
+  if(kind==='petal') return '<ellipse rx="4.2" ry="2.4" fill="'+color+'" transform="rotate(35)"/>';
+  if(kind==='leaf') return '<path d="M0 -4.5 Q4.5 0 0 4.5 Q-4.5 0 0 -4.5Z" fill="'+color+'"/>';
+  if(kind==='flake') return '<circle r="2.4" fill="'+color+'"/>';
+  return '';
+}
+function seasonParticles(season){
+  const meta = seasonMeta(season);
+  if(!meta.kind || meta.count===0) return '';
+  let s='';
+  for(let i=0;i<meta.count;i++){
+    const x = Math.round((i*97+43)%800);
+    const dur = (8 + (i%5)*1.7).toFixed(1);
+    const delay = (-((i*1.3)%Number(dur))).toFixed(1);
+    const drift = ((i%2===0? 1:-1) * (16+ (i*5)%26));
+    const color = meta.colors[i % meta.colors.length];
+    s += '<g transform="translate('+x+',0)"><g class="falling" style="--drift:'+drift+'px;animation-duration:'+dur+'s;animation-delay:'+delay+'s">'+particleShape(meta.kind, color)+'</g></g>';
+  }
+  return s;
+}
+
+/* ===================== scene ===================== */
+let justBought = null;
+
+function sceneSVG(theme){
+  const g = theme.ground;
+  const sky = theme.sky, gr = theme.grass;
+  const season = effectiveSeason();
+  const meta = seasonMeta(season);
+  let s = '<svg class="scene" viewBox="0 0 800 300" role="img" aria-label="Your '+theme.label+' in '+season+'">';
+  s += '<defs><linearGradient id="sky_'+theme.key+'" x1="0" y1="0" x2="0" y2="1">'
+     + '<stop offset="0%" stop-color="'+sky[0]+'"/><stop offset="100%" stop-color="'+sky[1]+'"/></linearGradient></defs>';
+  s += '<rect width="800" height="300" fill="url(#sky_'+theme.key+')"/>';
+  if(meta.skyWash) s += '<rect width="800" height="'+(g+20)+'" fill="'+meta.skyWash+'"/>';
+
+  // stars (night only)
+  s += '<g class="stars">';
+  const starPts = [[60,40],[140,72],[228,34],[310,58],[398,28],[470,66],[556,40],[640,70],[720,36],[770,62],[186,26],[350,88],[610,24]];
+  starPts.forEach(function(p,i){ s += '<circle cx="'+p[0]+'" cy="'+p[1]+'" r="'+(i%3===0?1.8:1.2)+'" fill="#F6F0DA"/>'; });
+  s += '</g>';
+
+  // sun / moon
+  s += '<circle cx="686" cy="62" r="26" fill="#F2D79A" opacity=".85"/>';
+  s += '<circle cx="686" cy="62" r="36" fill="#F2D79A" opacity=".2"/>';
+
+  // clouds
+  s += '<g class="drift" opacity=".8">'+cloud(60,66,1)+'</g>';
+  s += '<g class="drift2" opacity=".65">'+cloud(-140,104,.72)+'</g>';
+
+  if(theme.key === 'forest'){
+    s += '<g opacity=".35">'+farPines(gr[1])+'</g>';
+  }
+  if(theme.key === 'city'){
+    s += '<g opacity=".3">'+skyline()+'</g>';
+  }
+
+  // hills
+  s += '<path d="M0 '+(g-28)+' q120 -46 250 -14 q130 32 250 -18 q140 -40 300 12 V300 H0 Z" fill="'+gr[1]+'" opacity=".75"/>';
+  s += '<path d="M0 '+g+' q150 -26 320 -6 q170 20 300 -12 q100 -24 180 4 V300 H0 Z" fill="'+gr[0]+'"/>';
+  s += '<rect y="'+(g+22)+'" width="800" height="'+(300-g-22)+'" fill="'+gr[1]+'"/>';
+  if(meta.groundWash) s += '<rect y="'+(g-6)+'" width="800" height="'+(300-g+6)+'" fill="'+meta.groundWash+'"/>';
+
+  if(theme.key === 'city'){
+    s += '<g opacity=".5" stroke="'+gr[1]+'" stroke-width="2">';
+    for(let y=g+18;y<300;y+=13){ s += '<path d="M0 '+y+' h800"/>'; }
+    for(let x=14;x<800;x+=34){ s += '<path d="M'+x+' '+(g+14)+' v'+(300-g-14)+'" opacity=".5"/>'; }
+    s += '</g>';
+  }else{
+    s += '<g opacity=".6">';
+    for(let i=0;i<46;i++){
+      const x = (i*17.3+11)%796, y = g + 14 + (i*7)%42;
+      s += '<path d="M'+x+' '+y+' q2 -6 4 -1" stroke="'+gr[1]+'" stroke-width="1.6" fill="none"/>';
+    }
+    s += '</g>';
+  }
+
+  // owned items, drawn back to front by x
+  const owned = theme.items.filter(function(it){ return state.owned.indexOf(it.id) >= 0; });
+  owned.forEach(function(it){
+    const inner = (justBought === it.id) ? '<g class="sprout">'+it.draw()+'</g>' : it.draw();
+    s += '<g transform="translate('+it.x+','+(g + 16 + (it.x%3)*3)+') scale('+it.s+')">'+inner+'</g>';
+  });
+
+  s += seasonParticles(season);
+  s += '</svg>';
+  return s;
+}
+function cloud(x,y,sc){
+  return '<g transform="translate('+x+','+y+') scale('+sc+')" fill="#FBF6E9">'
+    + '<ellipse cx="0" cy="0" rx="30" ry="13"/><circle cx="-14" cy="-6" r="13"/>'
+    + '<circle cx="6" cy="-11" r="16"/><circle cx="22" cy="-4" r="11"/></g>';
+}
+function farPines(col){
+  let s='';
+  for(let i=0;i<22;i++){
+    const x = i*38+8, h = 60 + (i*23)%46;
+    s += '<path d="M'+x+' 226 L'+(x-20)+' 226 L'+x+' '+(226-h)+' L'+(x+20)+' 226 Z" fill="'+col+'"/>';
+  }
+  return s;
+}
+function skyline(){
+  let s='';
+  const w=[52,38,64,44,58,36,70,48,40,60,50,44];
+  let x=0;
+  for(let i=0;i<w.length;i++){
+    const h = 60 + (i*29)%70;
+    s += '<rect x="'+x+'" y="'+(224-h)+'" width="'+w[i]+'" height="'+(h+8)+'" fill="#8C8270"/>';
+    if(i%3===0) s += '<path d="M'+x+' '+(224-h)+' h'+w[i]+' l-'+(w[i]/2)+' -18 Z" fill="#8C8270"/>';
+    x += w[i]+10;
+  }
+  return s;
+}
+
+function paintScene(){
+  const theme = THEME_BY_KEY[state.view];
+  $('sceneHost').innerHTML = sceneSVG(theme);
+  const ov = $('sceneOverlay');
+  ov.innerHTML = '';
+  const hasLand = state.owned.indexOf('land_'+theme.key) >= 0;
+  if(!hasLand){
+    ov.innerHTML = '<div class="locked"><div><h3>'+theme.landName+'</h3>'
+      + '<p>'+theme.landDesc+'</p>'
+      + '<button class="btn primary" data-buyland="'+theme.key+'">Buy for '+theme.landPrice+' coins</button></div></div>';
+  }else{
+    const n = theme.items.filter(function(it){ return state.owned.indexOf(it.id)>=0; }).length;
+    if(n === 0){
+      ov.innerHTML = '<div class="scene-empty"><span>Nothing here yet. Open the shop and plant something.</span></div>';
+    }
+  }
+  justBought = null;
+}
+
+function paintLandTabs(){
+  const host = $('landTabs'); host.innerHTML='';
+  THEMES.forEach(function(t){
+    const b = document.createElement('button');
+    b.type='button'; b.setAttribute('role','tab');
+    b.setAttribute('aria-selected', String(state.view===t.key));
+    const locked = state.owned.indexOf('land_'+t.key) < 0;
+    b.textContent = t.label + (locked ? ' 🔒' : '');
+    b.addEventListener('click', function(){ state.view=t.key; save(); paintLandTabs(); paintScene(); });
+    host.appendChild(b);
+  });
+}
+
+/* ===================== shop ===================== */
+let shopTab = 'countryside';
+
+function thumb(it){
+  return '<svg class="thumb" viewBox="-58 -112 116 122" aria-hidden="true">'
+    + '<g transform="translate(0,0)">'+it.draw()+'</g></svg>';
+}
+function landThumb(t){
+  return '<svg class="thumb" viewBox="0 0 160 110" aria-hidden="true">'
+    + '<rect width="160" height="110" fill="'+t.sky[1]+'"/>'
+    + '<path d="M0 66 q40 -18 80 -4 q40 14 80 -6 V110 H0 Z" fill="'+t.grass[0]+'"/>'
+    + '<rect y="88" width="160" height="22" fill="'+t.grass[1]+'"/>'
+    + '<circle cx="128" cy="26" r="13" fill="#F2D79A"/></svg>';
+}
+
+function soundThumb(snd){
+  return '<div class="thumb" style="display:flex;align-items:center;justify-content:center;font-size:2.2rem" aria-hidden="true">'+snd.icon+'</div>';
+}
+
+function paintShop(){
+  stopPreview();
+  const tabs = $('shopTabs'); tabs.innerHTML='';
+  THEMES.concat([{key:'sounds', label:'Sounds'}]).forEach(function(t){
+    const b=document.createElement('button');
+    b.type='button'; b.setAttribute('role','tab');
+    b.setAttribute('aria-selected', String(shopTab===t.key));
+    b.textContent=t.label;
+    b.addEventListener('click', function(){ shopTab=t.key; paintShop(); });
+    tabs.appendChild(b);
+  });
+
+  if(shopTab === 'sounds'){
+    const goods = $('goods'); goods.innerHTML='';
+    SOUNDS.forEach(function(snd){
+      const owned = state.owned.indexOf(snd.id) >= 0;
+      const el = document.createElement('div');
+      el.className='good';
+      el.innerHTML = soundThumb(snd)
+        + '<span class="nm">'+snd.icon+' '+snd.name+'</span>'
+        + '<span class="ds">'+snd.desc+'</span>'
+        + '<div class="row" style="gap:8px;flex-wrap:wrap">'
+        +   '<button class="buy" data-preview="'+snd.id+'" aria-pressed="false" style="background:var(--paper-2);color:var(--ink);border-color:var(--line);box-shadow:none;flex:none">▶ Preview</button>'
+        +   (owned
+            ? '<span class="owned-tag" style="margin-left:auto">✓ Yours</span>'
+            : '<span class="price" style="margin-left:auto">'+coinIcon(16)+snd.price+'</span>'
+              + '<button class="buy" data-buy="'+snd.id+'"'+(state.coins < snd.price ? ' disabled' : '')+'>'
+              + (state.coins < snd.price ? 'Too dear' : 'Buy') + '</button>')
+        + '</div>';
+      goods.appendChild(el);
+    });
+    wireBuys();
+    wirePreviews();
+    return;
+  }
+
+  const t = THEME_BY_KEY[shopTab];
+  const hasLand = state.owned.indexOf('land_'+t.key) >= 0;
+  const goods = $('goods'); goods.innerHTML='';
+
+  // land card
+  const land = document.createElement('div');
+  land.className='good land';
+  land.innerHTML = landThumb(t)
+    + '<div style="display:flex;flex-direction:column;gap:4px;flex:1">'
+    +   '<span class="nm">'+t.landName+'</span>'
+    +   '<span class="ds">'+t.landDesc+'</span>'
+    +   '<div class="row">'
+    +     (hasLand
+        ? '<span class="owned-tag">✓ Yours</span>'
+        : '<span class="price">'+coinIcon(16)+t.landPrice+'</span><button class="buy" data-buy="land_'+t.key+'">Buy land</button>')
+    +   '</div>'
+    + '</div>';
+  goods.appendChild(land);
+
+  if(!hasLand){
+    const note = document.createElement('div');
+    note.className='locked-note';
+    note.textContent = 'Buy the land first and the rest of '+t.label.toLowerCase()+' opens up.';
+    goods.appendChild(note);
+    wireBuys();
+    return;
+  }
+
+  t.items.forEach(function(it){
+    const owned = state.owned.indexOf(it.id) >= 0;
+    const el = document.createElement('div');
+    el.className='good';
+    el.innerHTML = thumb(it)
+      + '<span class="nm">'+it.name+'</span>'
+      + '<span class="ds">'+it.desc+'</span>'
+      + '<div class="row">'
+      + (owned
+          ? '<span class="owned-tag">✓ Built</span>'
+          : '<span class="price">'+coinIcon(16)+it.price+'</span>'
+            + '<button class="buy" data-buy="'+it.id+'"'+(state.coins < it.price ? ' disabled' : '')+'>'
+            + (state.coins < it.price ? 'Too dear' : 'Buy') + '</button>')
+      + '</div>';
+    goods.appendChild(el);
+  });
+  wireBuys();
+}
+
+function wireBuys(){
+  document.querySelectorAll('[data-buy]').forEach(function(b){
+    b.addEventListener('click', function(){ buy(b.getAttribute('data-buy')); });
+  });
+}
+
+function buy(id){
+  let price, name, isSound=false;
+  if(id.indexOf('land_') === 0){
+    const t = THEME_BY_KEY[id.slice(5)];
+    if(!t) return;
+    price = t.landPrice; name = t.landName;
+  }else if(SOUND_BY_ID[id]){
+    const snd = SOUND_BY_ID[id];
+    price = snd.price; name = snd.name; isSound = true;
+  }else{
+    const it = ALL_ITEMS[id];
+    if(!it) return;
+    price = it.price; name = it.name;
+  }
+  if(state.owned.indexOf(id) >= 0) return;
+  if(state.coins < price){ toast('🪙','You need '+(price-state.coins)+' more coins for that.'); return; }
+  state.coins -= price;
+  state.owned.push(id);
+  if(id.indexOf('land_') !== 0) state.stats.purchases += 1;
+  if(isSound){
+    /* no scene change */
+  }else if(id.indexOf('land_') === 0){ state.view = id.slice(5); }
+  else { justBought = id; state.view = THEMES.find(function(t){ return t.items.some(function(i){return i.id===id;}); }).key; }
+  save();
+  paintAll();
+  paintShop();
+  toast(isSound ? SOUND_BY_ID[id].icon : '🌱', name + (isSound ? ' is ready to play.' : ' is yours.'));
+  checkBadges();
+}
+
+document.addEventListener('click', function(e){
+  const b = e.target.closest && e.target.closest('[data-buyland]');
+  if(b){ buy('land_'+b.getAttribute('data-buyland')); }
+});
+
+/* ===================== settings ===================== */
+function paintSettings(){
+  document.querySelectorAll('.stepper').forEach(function(st){
+    st.querySelector('input').value = state.settings[st.dataset.key];
+  });
+  $('soundToggle').setAttribute('aria-checked', String(!!state.settings.sound));
+  $('autoToggle').setAttribute('aria-checked', String(!!state.settings.autoContinue));
+  $('stopwatchToggle').setAttribute('aria-checked', String(!!state.settings.stopwatch));
+  document.querySelectorAll('#seasonPicker button').forEach(function(b){
+    b.setAttribute('aria-pressed', String(b.dataset.season === state.settings.season));
+  });
+  const cur = autoSeason();
+  $('seasonNote').textContent = state.settings.season === 'auto'
+    ? 'Auto — right now that\u2019s ' + cur.charAt(0).toUpperCase() + cur.slice(1)
+    : 'Locked to ' + state.settings.season.charAt(0).toUpperCase() + state.settings.season.slice(1);
+}
+
+$('seasonPicker').addEventListener('click', function(e){
+  const b = e.target.closest('button[data-season]');
+  if(!b) return;
+  state.settings.season = b.dataset.season;
+  save();
+  paintSettings();
+  paintScene();
+});
+
+document.querySelectorAll('.stepper').forEach(function(st){
+  const key = st.dataset.key;
+  const min = +st.dataset.min, max = +st.dataset.max;
+  const input = st.querySelector('input');
+  function commit(v){
+    state.settings[key] = clampInt(v, min, max, state.settings[key]);
+    input.value = state.settings[key];
+    save();
+    if(!running && remaining === total) resetPhase(false); else paintPhase();
+    paintPhase();
+  }
+  st.querySelectorAll('button').forEach(function(b){
+    b.addEventListener('click', function(){ commit(state.settings[key] + (+b.dataset.step)); });
+  });
+  input.addEventListener('change', function(){ commit(input.value); });
+  input.addEventListener('blur', function(){ commit(input.value); });
+});
+
+$('soundToggle').addEventListener('click', function(){
+  state.settings.sound = !state.settings.sound;
+  $('soundToggle').setAttribute('aria-checked', String(state.settings.sound));
+  save();
+  if(state.settings.sound){ chimeUnlock(); chime('back'); }
+});
+
+$('autoToggle').addEventListener('click', function(){
+  state.settings.autoContinue = !state.settings.autoContinue;
+  $('autoToggle').setAttribute('aria-checked', String(state.settings.autoContinue));
+  save();
+});
+
+$('resetBtn').addEventListener('click', function(){
+  if(!confirm('This clears your coins and everything you have built. Carry on?')) return;
+  state = JSON.parse(JSON.stringify(DEFAULTS));
+  seenBadges = null;
+  swReset();
+  phase='focus'; save(); applyTheme(); resetPhase(false); paintAll(); paintShop(); paintSettings();
+  syncAmbientVoices(); paintAmbience();
+  seenBadges = ownedBadgeIds(state);
+  toast('🧹','All cleared. Fresh meadow.');
+});
+
+$('aboutBtn').addEventListener('click', function(){
+  if(!state.stats.foundHeart){
+    state.stats.foundHeart = true;
+    save();
+    checkBadges();
+  }
+  openModal($('aboutModal'));
+});
+
+/* ===================== theme ===================== */
+const SUN = '<circle cx="12" cy="12" r="4.2"/><path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6l1.4 1.4M17 17l1.4 1.4M18.4 5.6L17 7M7 17l-1.4 1.4"/>';
+const MOON = '<path d="M20 13.6A8.2 8.2 0 1 1 10.4 4a6.6 6.6 0 0 0 9.6 9.6z"/>';
+function isDark(){
+  const t = document.documentElement.getAttribute('data-theme');
+  if(t) return t === 'dark';
+  return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+}
+function applyTheme(){
+  if(state.theme) document.documentElement.setAttribute('data-theme', state.theme);
+  else document.documentElement.removeAttribute('data-theme');
+  $('dnIcon').innerHTML = isDark() ? SUN : MOON;
+  $('dayNight').setAttribute('aria-label', isDark() ? 'Switch to daytime' : 'Switch to night');
+}
+$('dayNight').addEventListener('click', function(){
+  state.theme = isDark() ? 'light' : 'dark';
+  applyTheme(); save();
+});
+
+/* ===================== modals ===================== */
+function openModal(el){ el.classList.add('open'); document.body.style.overflow='hidden'; }
+function closeModals(){
+  stopPreview();
+  document.querySelectorAll('.modal.open').forEach(function(m){ m.classList.remove('open'); });
+  document.body.style.overflow='';
+}
+$('openShop').addEventListener('click', function(){ trackShopVisit(); paintShop(); openModal($('shopModal')); });
+$('openSettings').addEventListener('click', function(){ paintSettings(); openModal($('settingsModal')); });
+document.querySelectorAll('[data-close]').forEach(function(b){ b.addEventListener('click', closeModals); });
+document.querySelectorAll('.modal').forEach(function(m){
+  m.addEventListener('click', function(e){ if(e.target === m) closeModals(); });
+});
+
+/* ===================== quotes ===================== */
+const QUOTES = [
+  'Slow work is still work.',
+  'The kettle doesn\u2019t rush, and the tea is fine.',
+  'One good hour is worth three scattered ones.',
+  'Even the moss takes its time.',
+  'Small rooms, tended well, become whole houses.',
+  'A field grows one season at a time.',
+  'Rest is not the opposite of work — it\u2019s part of it.',
+  'Tend what\u2019s in front of you.',
+  'Let the bread rise. Let the mind too.',
+  'What you finish today, you don\u2019t carry tomorrow.',
+  'The path is made by walking it, not by staring at it.',
+  'Quiet hours build the sturdiest houses.'
+];
+function newQuote(){ $('quote').textContent = QUOTES[Math.floor(Math.random()*QUOTES.length)]; }
+
+/* ===================== achievements ===================== */
+function ownedGoodsCount(s){ return s.owned.filter(function(id){ return id.indexOf('land_')!==0; }).length; }
+function totalGoodsCount(){ return Object.keys(ALL_ITEMS).length + SOUNDS.length; }
+function hrs(n){ return n*3600; }
+
+const BADGES = [
+  /* --- total work time --- */
+  {id:'time_first', cat:'time', glyph:'🌱', name:'First Steps', desc:'Complete your first work session.', check:function(s){return s.stats.sessions>=1;}},
+  {id:'time_1', cat:'time', glyph:'🕐', name:'One Hour In', desc:'Work for 1 hour total.', check:function(s){return s.stats.totalWorkSeconds>=hrs(1);}},
+  {id:'time_5', cat:'time', glyph:'🕔', name:'Getting Serious', desc:'Work for 5 hours total.', check:function(s){return s.stats.totalWorkSeconds>=hrs(5);}},
+  {id:'time_10', cat:'time', glyph:'🕙', name:'Dedicated', desc:'Work for 10 hours total.', check:function(s){return s.stats.totalWorkSeconds>=hrs(10);}},
+  {id:'time_12', cat:'time', glyph:'🌗', name:'Half a Day', desc:'Work for 12 hours total.', check:function(s){return s.stats.totalWorkSeconds>=hrs(12);}},
+  {id:'time_20', cat:'time', glyph:'⏳', name:'Twenty Hours', desc:'Work for 20 hours total.', check:function(s){return s.stats.totalWorkSeconds>=hrs(20);}},
+  {id:'time_24', cat:'time', glyph:'🌞', name:'A Full Day', desc:'Work for 24 hours total.', check:function(s){return s.stats.totalWorkSeconds>=hrs(24);}},
+  {id:'time_50', cat:'time', glyph:'📅', name:'50 Hours', desc:'Work for 50 hours total.', check:function(s){return s.stats.totalWorkSeconds>=hrs(50);}},
+  {id:'time_100', cat:'time', glyph:'🏆', name:'Century Club', desc:'Work for 100 hours total.', check:function(s){return s.stats.totalWorkSeconds>=hrs(100);}},
+  {id:'time_250', cat:'time', glyph:'🌟', name:'Time Traveler', desc:'Work for 250 hours total.', check:function(s){return s.stats.totalWorkSeconds>=hrs(250);}},
+  {id:'time_500', cat:'time', glyph:'⚡', name:'The Grind', desc:'Work for 500 hours total.', check:function(s){return s.stats.totalWorkSeconds>=hrs(500);}},
+  {id:'time_1000', cat:'time', glyph:'👑', name:'No Stopping Now', desc:'Work for 1,000 hours total.', check:function(s){return s.stats.totalWorkSeconds>=hrs(1000);}},
+
+  /* --- coins earned (lifetime, not balance) --- */
+  {id:'coin_1', cat:'coin', glyph:'🪙', name:'First Coin', desc:'Earn your first coin.', check:function(s){return s.stats.coinsEarned>=1;}},
+  {id:'coin_100', cat:'coin', glyph:'👛', name:'Pocket Money', desc:'Earn 100 coins.', check:function(s){return s.stats.coinsEarned>=100;}},
+  {id:'coin_500', cat:'coin', glyph:'💰', name:'Saving Up', desc:'Earn 500 coins.', check:function(s){return s.stats.coinsEarned>=500;}},
+  {id:'coin_1000', cat:'coin', glyph:'🏦', name:'Coin Collector', desc:'Earn 1,000 coins.', check:function(s){return s.stats.coinsEarned>=1000;}},
+  {id:'coin_5000', cat:'coin', glyph:'🗃️', name:'Treasure Chest', desc:'Earn 5,000 coins.', check:function(s){return s.stats.coinsEarned>=5000;}},
+  {id:'coin_10000', cat:'coin', glyph:'💎', name:'Rich in Time', desc:'Earn 10,000 coins.', check:function(s){return s.stats.coinsEarned>=10000;}},
+  {id:'coin_25000', cat:'coin', glyph:'🖨️', name:'Money Printer', desc:'Earn 25,000 coins.', check:function(s){return s.stats.coinsEarned>=25000;}},
+  {id:'coin_100000', cat:'coin', glyph:'🐉', name:'Dragon\u2019s Hoard', desc:'Earn 100,000 coins.', check:function(s){return s.stats.coinsEarned>=100000;}},
+
+  /* --- shop --- */
+  {id:'shop_first', cat:'shop', glyph:'🛒', name:'First Purchase', desc:'Buy your first item.', check:function(s){return s.stats.purchases>=1;}},
+  {id:'shop_visit10', cat:'shop', glyph:'👀', name:'Window Shopper', desc:'Visit the shop 10 times.', check:function(s){return s.stats.shopVisits>=10;}},
+  {id:'shop_buy5', cat:'shop', glyph:'🎁', name:'Treat Yourself', desc:'Buy 5 items.', check:function(s){return s.stats.purchases>=5;}},
+  {id:'shop_own10', cat:'shop', glyph:'🧺', name:'Collector', desc:'Own 10 different items.', check:function(s){return ownedGoodsCount(s)>=10;}},
+  {id:'shop_own25', cat:'shop', glyph:'🏠', name:'Interior Designer', desc:'Own 25 items.', check:function(s){return ownedGoodsCount(s)>=25;}},
+  {id:'shop_buy50', cat:'shop', glyph:'🛍️', name:'Can\u2019t Stop Shopping', desc:'Buy 50 items.', check:function(s){return s.stats.purchases>=50;}},
+  {id:'shop_empty', cat:'shop', glyph:'📭', name:'Empty Shelves', desc:'Buy every item currently available in the shop.', check:function(s){return ownedGoodsCount(s)>=totalGoodsCount();}},
+  {id:'shop_complete', cat:'shop', glyph:'🌍', name:'Completionist', desc:'Own every available collectible.', check:function(s){return s.owned.length>=(totalGoodsCount()+THEMES.length);}},
+
+  /* --- special --- */
+  {id:'special_tiny', cat:'special', glyph:'🐣', name:'Tiny Victory', desc:'Complete a work session lasting at least 1 minute.', check:function(s){return s.stats.sessions>=1;}},
+  {id:'special_grass', cat:'special', glyph:'🌾', name:'Touch Grass', desc:'Complete a single session of 4+ hours, then stop or end it.', check:function(s){return !!s.stats.touchGrass;}},
+
+  /* --- secret --- */
+  {id:'secret_heart', cat:'secret', glyph:'❤️', name:'Heartwood', desc:'Discover the secret message.', secret:true, check:function(s){return !!s.stats.foundHeart;}},
+
+  /* --- village (bonus, not part of the requested set but fits the theme) --- */
+  {id:'village_lands', cat:'village', glyph:'🗺️', name:'Three Corners', desc:'Own the Countryside, Forest and City.', check:function(s){return ['countryside','forest','city'].every(function(k){return s.owned.indexOf('land_'+k)>=0;});}},
+  {id:'village_full', cat:'village', glyph:'🏘️', name:'Fully Settled', desc:'Own every building in one region.', check:function(s){return THEMES.some(function(t){return t.items.every(function(it){return s.owned.indexOf(it.id)>=0;});});}}
+];
+const BADGE_BY_ID = {}; BADGES.forEach(function(b){ BADGE_BY_ID[b.id]=b; });
+const BADGE_CATEGORIES = [
+  {cat:'time', label:'Total Work Time'},
+  {cat:'coin', label:'Coins'},
+  {cat:'shop', label:'Shop'},
+  {cat:'special', label:'Special'},
+  {cat:'secret', label:'Secret'},
+  {cat:'village', label:'Village'}
+];
+
+let seenBadges = null;
+function ownedBadgeIds(s){ return BADGES.filter(function(b){return b.check(s);}).map(function(b){return b.id;}); }
+function checkBadges(){
+  if(!seenBadges) seenBadges = ownedBadgeIds(state);
+  const now = ownedBadgeIds(state);
+  now.forEach(function(id){
+    if(seenBadges.indexOf(id)===-1){
+      const b = BADGE_BY_ID[id];
+      toastAchievement(b.glyph, b.name);
+    }
+  });
+  seenBadges = now;
+}
+function toastAchievement(icon, name){
+  const rail = $('toasts');
+  const el = document.createElement('div');
+  el.className = 'toast toast-gold';
+  el.innerHTML = '<span style="font-size:1.5rem;flex:none">'+icon+'</span>'
+    + '<span><b style="display:block;font-size:.68rem;letter-spacing:.05em;text-transform:uppercase;opacity:.85;margin-bottom:2px">Achievement unlocked</b>'+name+'</span>';
+  rail.appendChild(el);
+  setTimeout(function(){
+    el.style.transition='opacity .4s ease, transform .4s ease';
+    el.style.opacity='0'; el.style.transform='translateY(8px)';
+    setTimeout(function(){ el.remove(); }, 420);
+  }, 4400);
+}
+function trackShopVisit(){
+  state.stats.shopVisits += 1;
+  save();
+  checkBadges();
+}
+function paintBadges(){
+  const grid = $('badgeGrid'); grid.innerHTML='';
+  BADGE_CATEGORIES.forEach(function(group){
+    const items = BADGES.filter(function(b){ return b.cat === group.cat; });
+    if(!items.length) return;
+    const gotCount = items.filter(function(b){ return b.check(state); }).length;
+    const head = document.createElement('div');
+    head.style.cssText = 'grid-column:1/-1;display:flex;align-items:baseline;gap:8px;margin:14px 0 2px;padding-top:6px;border-top:1px dashed var(--line)';
+    head.innerHTML = '<h3 style="font-size:1rem;margin:0">'+group.label+'</h3><span style="font-size:.78rem;color:var(--ink-soft);margin-left:auto">'+gotCount+' / '+items.length+'</span>';
+    grid.appendChild(head);
+    items.forEach(function(b){
+      const got = b.check(state);
+      const hideDetails = b.secret && !got;
+      const el = document.createElement('div');
+      el.className = 'badge' + (got ? '' : ' b-locked');
+      el.innerHTML = '<span class="glyph">'+(got?b.glyph:'🔒')+'</span>'
+        + '<span class="nm">'+(hideDetails?'???':b.name)+'</span>'
+        + '<span class="ds">'+(hideDetails?'A hidden achievement. It\u2019s somewhere in the app.':b.desc)+'</span>';
+      grid.appendChild(el);
+    });
+  });
+}
+$('openBadges').addEventListener('click', function(){ paintBadges(); openModal($('badgesModal')); });
+
+/* ===================== save & load file ===================== */
+function saveFileName(){
+  const d = new Date();
+  const pad = function(n){ return String(n).padStart(2,'0'); };
+  return 'hearthwood-save-'+d.getFullYear()+pad(d.getMonth()+1)+pad(d.getDate())+'.json';
+}
+async function downloadSaveFile(){
+  const data = JSON.stringify(state, null, 2);
+  const filename = saveFileName();
+  let ok = false;
+  try{
+    if(window.claude && typeof window.claude.use === 'function'){
+      const downloads = await claude.use('downloads');
+      if(downloads){
+        const res = await downloads.save({filename, data});
+        ok = !!res;
+      }
+    }
+  }catch(e){ ok = false; }
+  if(!ok){
+    try{
+      const blob = new Blob([data], {type:'application/json'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = filename;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(function(){ URL.revokeObjectURL(url); }, 2000);
+      ok = true;
+    }catch(e){ ok = false; }
+  }
+  if(ok){
+    $('lastSaved').textContent = 'Saved just now';
+    toast('🧺', 'Save file downloaded.');
+  }else{
+    toast('⚠️', 'Couldn\u2019t start the download — try again?');
+  }
+}
+function importSaveFile(file){
+  const reader = new FileReader();
+  reader.onload = function(){
+    let parsed = null;
+    try{ parsed = JSON.parse(reader.result); }catch(e){}
+    const clean = sanitize(parsed);
+    if(!clean){ toast('⚠️', 'That file doesn\u2019t look like a Hearthwood save.'); return; }
+    if(!confirm('Load this save? It will replace your current coins and buildings.')) return;
+    state = clean;
+    seenBadges = null;
+    save();
+    applyTheme();
+    phase = 'focus';
+    resetPhase(false);
+    paintAll(); paintSettings(); checkBadges();
+    syncAmbientVoices(); paintAmbience();
+    closeModals();
+    toast('📬', 'Save file loaded.');
+  };
+  reader.readAsText(file);
+}
+$('openSaveLoad').addEventListener('click', function(){ openModal($('saveModal')); });
+$('downloadSave').addEventListener('click', downloadSaveFile);
+$('loadSaveBtn').addEventListener('click', function(){ $('loadSaveInput').click(); });
+$('loadSaveInput').addEventListener('change', function(e){
+  const f = e.target.files && e.target.files[0];
+  if(f) importSaveFile(f);
+  e.target.value = '';
+});
+
+/* ===================== boot ===================== */
+function paintAll(){
+  paintCoins(); paintLandTabs(); paintScene(); paintPhase();
+}
+
+const local = loadLocal();
+if(local) state = local;
+applyTheme();
+resetPhase(false);
+paintAll();
+paintSettings();
+paintClock();
+newQuote();
+seenBadges = ownedBadgeIds(state);
+
+if(window.matchMedia){
+  const mq = window.matchMedia('(prefers-color-scheme: dark)');
+  if(mq.addEventListener) mq.addEventListener('change', applyTheme);
+}
+
+if(window.claude && typeof window.claude.use === 'function'){
+  initCloud().catch(function(){});
+}
+})();
+</script>
+</body>
+</html>
